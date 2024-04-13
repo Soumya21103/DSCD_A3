@@ -1,7 +1,6 @@
 
 
-
-class ReduceeServicer(object):
+class ReduceServicer(object):
     '''Reciever for all rpc'''
     pass
 
@@ -25,9 +24,6 @@ class Reducer:
         pass
 
     def reduce(self):
-        pass
-
-    def send_results(self):
         pass
 
 if __name__ == "__main__":

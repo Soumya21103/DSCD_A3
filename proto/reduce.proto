@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package Reducer;
+
+service Reducer {
+    rpc invokeReducer (invocationRequest) returns (invocationResponse);
+    rpc HeartBeat (HeartBeatRequest) returns (HeartBeatResponse);
+    rpc getOutputFile (OutputFileRequest) returns (stream OutputFileResponse);
+}
+
+message HeartBeatRequest {
+    int32 reducer_id = 1;
+}
+
+message HeartBeatResponse {
+    int32 reducer_id = 1;
+    bool status = 2; // if reducer id match and no other problem exist then returns true else false 
+}
+
+message OutputFileRequest {
+    int32 reducer_id = 1;
+    string out_file_name = 2; // change acordingly can be anything
+}
+message OutputFileResponse {
+    // this will send the list of lines in outputfile returns out_file_name == '' if output is does not exist
+    int32 reducer_id = 1; // id assinged by MASTER helps determine which partition will be assigned to which reducer
+    string out_file_name = 2; // '' if output does not exist
+    string out_file_line = 3; // empty if output does not exist
+}
+
+message centroidKeys {
+    int32 centroid_id = 1;
+    float value = 2;
+}
+message invocationRequest {
+    int32 reducer_id = 1; // id assinged by MASTER helps determine which partition will be assigned to which reducer
+    repeated string mapper_socket = 2; // list of socket of mappers format "ip_adress:port_no"
+    repeated centroidKeys centroids = 3; // list of centroid in centroid key format
+}
+
+message invocationResponse {
+    int32 reducer_id = 1; // id assigned id master -1 if invocation fails
+    bool status = 2; // True if invocation succesfull else False
+}
