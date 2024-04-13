@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+service Mapper {
+    rpc GetPartition (MapperRequest) returns (MapperResponse) {}
+}
+
+message MapperRequest {
+    int32 partition_index = 1;
+}
+
+message Point {
+    double x = 1;
+    double y = 2;
+}
+
+message MapperItem {
+    int32 index = 1;
+    Point point = 2;
+    int32 count = 3;
+}
+
+message MapperResponse {
+    repeated MapperItem items = 1;
+}
