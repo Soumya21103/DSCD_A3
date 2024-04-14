@@ -2,6 +2,7 @@ syntax = "proto3";
 
 service Mapper {
     rpc GetPartition (MapperRequest) returns (MapperResponse) {}
+    rpc StartMapper (StartMapperRequest) returns (StartMapperResponse) {}
 }
 
 message MapperRequest {
@@ -21,4 +22,14 @@ message MapperItem {
 
 message MapperResponse {
     repeated MapperItem items = 1;
+}
+
+message StartMapperRequest {
+    repeated int32 indices = 1;
+    string input_file = 2;
+    string centroids_file = 3;
+}
+
+message StartMapperResponse {
+    bool success = 1;
 }
