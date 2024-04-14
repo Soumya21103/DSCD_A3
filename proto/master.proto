@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package master;
+
+service Mapper {
+  rpc GetIntermediateOutput(MapperRequest) returns (MapperResponse) {}
+}
+
+service Reducer {
+  rpc GetResult(ReducerRequest) returns (ReducerResponse) {}
+}
+
+message MapperRequest {
+  string inputData = 1;
+}
+
+message MapperResponse {
+  string intermediateData = 1;
+  bool status = 2;
+}
+
+message ReducerRequest {
+  string intermediateData = 1;
+}
+
+message ReducerResponse {
+    string output = 1;
+    bool status = 2;
+}
