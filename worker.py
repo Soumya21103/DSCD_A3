@@ -1,11 +1,12 @@
-from grpc_modules import mapper_pb2 as mp2
-from grpc_modules import mapper_pb2_grpc as mp2g
+from grpc_modules import mapper_pb2 
+from grpc_modules import mapper_pb2_grpc
 from grpc_modules import reduce_pb2 as rd2
 from grpc_modules import reduce_pb2_grpc as rd2g
 import grpc
 import asyncio
 import json
 import threading
+import math, os
 STATE = {
     "idle"   : 0,
     "reducer": 1,
@@ -77,8 +78,8 @@ class Reducer:
         partition = []
         try:
             with grpc.insecure_channel(m_socket,options=[('grpc.connect_timeout_ms', timeout*1000),]) as channel:
-                stub = mp2g.MapperStub(channel)
-                raw_ret: mp2.MapperResponse = stub.GetPartition(mp2.MapperRequest(partition_index=self.parent.ID))
+                stub = mapper_pb2_grpc.MapperStub(channel)
+                raw_ret: mapper_pb2.MapperResponse = stub.GetPartition(mapper_pb2.MapperRequest(partition_index=self.parent.ID))
         except grpc.RpcError as e:
             if isinstance(e, grpc.Call):
                 if e.code() == grpc.StatusCode.DEADLINE_EXCEEDED:
@@ -147,8 +148,116 @@ class Reducer:
             self.event_output.clear()
         return
 
+class MapperServer(mapper_pb2_grpc.MapperServicer):
+    def __init__(self, parent):
+        super().__init__()
+        self.parent: Worker = parent
+
+    def StartMapper(self, request, context):
+
+        # ASSUMED every mapper already knows location of input file
+        # self.input_file = request.input_file
+        centroids = [(point.x, point.y) for point in request.centroids]
+
+        if self.parent.set_as_mapper(centroids, list(request.indices), request.mapper_id, request.R):
+            return mapper_pb2.StartMapperResponse(success = True)
+
+        return mapper_pb2.StartMapperResponse(success=False)
+
+    def GetPartition(self, request, context):
+        partition_index = request.partition_index
+        pd = self.parent.mapper_api.partitioned_data
+
+        if partition_index in pd:
+            partition_items = pd[partition_index]
+            response = mapper_pb2.MapperResponse()
+            for item in partition_items:
+                partition_item = response.items.add()
+                partition_item.index = item[0]
+                partition_item.point.x = item[1][0][0]
+                partition_item.point.y = item[1][0][1]
+                partition_item.count = item[1][1]
+            return response
+        else:
+            context.set_code(grpc.StatusCode.NOT_FOUND)
+            context.set_details("Partition not found")
+            return mapper_pb2.MapperResponse()
+
+    def HeartBeat(self, request: mapper_pb2.HeartBeatRequest, context):
+        if self.parent.state == STATE["mapper"] and request.mapper_id == self.parent.ID:
+            return mapper_pb2.HeartBeatResponse(mapper_id=self.parent.ID,status=True)
+        return mapper_pb2.HeartBeatResponse(mapper_id=-1,status=False)
+
 class Mapper:
-    pass
+    def __init__(self,parent, id, input_indices,  centroids) -> None:
+        self.portID = f"5005{id}"
+        self.parent: Worker = parent
+        self.centroids = centroids
+        self.points = self.points_from_file("input.txt", input_indices)
+        self.partitioned_data = {}
+        self.R =0
+        
+    
+    def points_from_file(self, input_file, indices):
+        with open(input_file, 'r') as file:
+            lines = file.readlines()
+        points = [tuple(map(float, line.strip().split(','))) for i, line in enumerate(lines) if i in indices] 
+        return points
+    
+    def map(self, centroids, points, R):
+        intermediate_output = []
+        for p in points:
+            distance = []
+            for c in range(len(centroids)):
+                x1 = p[0]
+                y1 = p[1]
+                x2 = centroids[c][0]
+                y2 = centroids[c][1]
+                distance.append((c, math.pow(x1-x2, 2) + math.pow(y1-y2, 2)))
+            closest_centroid = min(distance, key=lambda x: x[1])
+            intermediate_output.append((closest_centroid[0], (p, 1)))
+
+        self.partition(intermediate_output, R)
+
+    def partition(self, inter, R):
+        id = self.id
+        node_dir = f"M{id}"
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        node_dir = os.path.join(script_dir, f"M{id}")
+        os.makedirs(node_dir, exist_ok=True)
+
+        K = set()
+        for j in inter:
+            K.add(j[0])
+            partition = j[0] % R
+            partition_file = os.path.join(node_dir, f"partition_{partition+1}.txt")
+
+            if partition not in self.partitioned_data.keys():
+                with open(partition_file, "w") as file:
+                    file.write(f"{j}\n")
+                self.partitioned_data[partition] = [j]
+            else:
+                with open(partition_file, "a") as file:
+                    file.write(f"{j}\n")
+                self.partitioned_data[partition].append(j)
+
+        # If R>K, create empty files for the extra partitions
+        if R>len(K):
+            k = len(K)+1
+            while k <= R:
+                partition_file = os.path.join(node_dir, f"partition_{k}.txt")
+                with open(partition_file, "w") as file:
+                    file.write(f"")
+                self.partitioned_data[k-1] = []
+                k+=1
+
+    def execute(self):
+        
+        self.map(self.centroids, self.points, self.R)
+        self.parent.state = STATE["idle"]
+        self.parent.ID = -1
+        del self.parent.mapper_api
+
 
 class Worker:
     def __init__(self) -> None:
@@ -182,6 +291,15 @@ class Worker:
             self.work_invocation()
             return True
         return False
+    
+    def set_as_mapper(self, centroids, input_indices, id, R):
+        if self.state == STATE["idle"]:
+            self.mapper_api = Mapper(self, id, input_indices, centroids, R)
+            self.ID = id
+            self.work_invocation()
+            return True
+        return False
+    
     
     def wait_for_invocation(self):
         if self.invoke_event.wait():
