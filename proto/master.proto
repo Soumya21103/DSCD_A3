@@ -2,14 +2,10 @@ syntax = "proto3";
 
 package master;
 
-service Mapper {
-  rpc GetIntermediateOutput(MapperRequest) returns (MapperResponse) {}
+service MasterService {
+  rpc WorkCompleteMapper () returns (MapperResponse);
+  rpc WorkCompleteReducer () returns (ReducerResponse);
 }
-
-service Reducer {
-  rpc GetResult(ReducerRequest) returns (ReducerResponse) {}
-}
-
 message MapperRequest {
   string inputData = 1;
 }
