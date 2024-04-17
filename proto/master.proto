@@ -2,28 +2,38 @@ syntax = "proto3";
 
 package master;
 
-service Mapper {
-  rpc GetIntermediateOutput(MapperRequest) returns (MapperResponse) {}
+service MasterServicer {
+  rpc startMapper(invokeMapper) returns (response);
+  rpc startReducer(invokeReducer) returns (response);
+
+  rpc workCompleteMap(ifComplete) returns (status);
+  rpc workCompleteReduce(ifComplete) returns (status);
 }
 
-service Reducer {
-  rpc GetResult(ReducerRequest) returns (ReducerResponse) {}
+message coordinate {
+  int64 x = 1;
+  int64 y = 2;
 }
 
-message MapperRequest {
-  string inputData = 1;
+message invokeMapper {
+  int64 startIndex= 1; 
+  int64 endIndex= 2;
+  repeated coordinate centroids= 3;
 }
 
-message MapperResponse {
-  string intermediateData = 1;
-  bool status = 2;
+message invokeReducer {
 }
 
-message ReducerRequest {
-  string intermediateData = 1;
+message response {
+  bool willWork = 1;
+  int64 id = 2;
 }
 
-message ReducerResponse {
-    string output = 1;
-    bool status = 2;
+message ifComplete {
 }
+
+message status {
+  bool ifDone = 1;
+  int64 id = 2;
+}
+
