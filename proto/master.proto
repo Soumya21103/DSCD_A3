@@ -6,8 +6,7 @@ service MasterServicer {
   rpc startMapper(invokeMapper) returns (response);
   rpc startReducer(invokeReducer) returns (response);
 
-  rpc workCompleteMap(ifComplete) returns (status);
-  rpc workCompleteReduce(ifComplete) returns (status);
+  rpc workComplete(ifComplete) returns (status);
 }
 
 message coordinate {

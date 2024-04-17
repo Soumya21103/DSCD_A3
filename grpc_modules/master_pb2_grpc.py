@@ -24,13 +24,8 @@ class MasterServicerStub(object):
                 request_serializer=master__pb2.invokeReducer.SerializeToString,
                 response_deserializer=master__pb2.response.FromString,
                 )
-        self.workCompleteMap = channel.unary_unary(
-                '/master.MasterServicer/workCompleteMap',
-                request_serializer=master__pb2.ifComplete.SerializeToString,
-                response_deserializer=master__pb2.status.FromString,
-                )
-        self.workCompleteReduce = channel.unary_unary(
-                '/master.MasterServicer/workCompleteReduce',
+        self.workComplete = channel.unary_unary(
+                '/master.MasterServicer/workComplete',
                 request_serializer=master__pb2.ifComplete.SerializeToString,
                 response_deserializer=master__pb2.status.FromString,
                 )
@@ -51,13 +46,7 @@ class MasterServicerServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def workCompleteMap(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def workCompleteReduce(self, request, context):
+    def workComplete(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -76,13 +65,8 @@ def add_MasterServicerServicer_to_server(servicer, server):
                     request_deserializer=master__pb2.invokeReducer.FromString,
                     response_serializer=master__pb2.response.SerializeToString,
             ),
-            'workCompleteMap': grpc.unary_unary_rpc_method_handler(
-                    servicer.workCompleteMap,
-                    request_deserializer=master__pb2.ifComplete.FromString,
-                    response_serializer=master__pb2.status.SerializeToString,
-            ),
-            'workCompleteReduce': grpc.unary_unary_rpc_method_handler(
-                    servicer.workCompleteReduce,
+            'workComplete': grpc.unary_unary_rpc_method_handler(
+                    servicer.workComplete,
                     request_deserializer=master__pb2.ifComplete.FromString,
                     response_serializer=master__pb2.status.SerializeToString,
             ),
@@ -131,7 +115,7 @@ class MasterServicer(object):
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
-    def workCompleteMap(request,
+    def workComplete(request,
             target,
             options=(),
             channel_credentials=None,
@@ -141,24 +125,7 @@ class MasterServicer(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/master.MasterServicer/workCompleteMap',
-            master__pb2.ifComplete.SerializeToString,
-            master__pb2.status.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def workCompleteReduce(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/master.MasterServicer/workCompleteReduce',
+        return grpc.experimental.unary_unary(request, target, '/master.MasterServicer/workComplete',
             master__pb2.ifComplete.SerializeToString,
             master__pb2.status.FromString,
             options, channel_credentials,
