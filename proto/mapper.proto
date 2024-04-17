@@ -3,6 +3,7 @@ syntax = "proto3";
 service Mapper {
     rpc GetPartition (MapperRequest) returns (MapperResponse) {}
     rpc StartMapper (StartMapperRequest) returns (StartMapperResponse) {}
+    rpc HeartBeat (HeartBeatRequest) returns (HeartBeatResponse);
 }
 
 message MapperRequest {
@@ -18,7 +19,7 @@ message MapperItem {
     int32 index = 1;
     Point point = 2;
     int32 count = 3;
-}
+} 
 
 message MapperResponse {
     repeated MapperItem items = 1;
@@ -26,10 +27,20 @@ message MapperResponse {
 
 message StartMapperRequest {
     repeated int32 indices = 1;
-    string input_file = 2;
-    string centroids_file = 3;
+    repeated Point centroid =2;
+    int32 mapper_id =3;
+    int32 R = 4;
 }
 
 message StartMapperResponse {
     bool success = 1;
+}
+
+message HeartBeatRequest {
+    int32 mapper_id = 1;
+}
+
+message HeartBeatResponse {
+    int32 mapper_id = 1;
+    bool status = 2; 
 }
