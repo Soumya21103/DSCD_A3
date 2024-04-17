@@ -7,9 +7,9 @@ import asyncio
 import json
 import threading
 STATE = {
-    "idle": 0,
+    "idle"   : 0,
     "reducer": 1,
-    "mapper": 2
+    "mapper" : 2
 }
 
 class ReduceServicer(rd2g.ReducerServicer):
@@ -156,6 +156,7 @@ class Worker:
         self.ID = -1
         self.reducer_api: Reducer = None
         self.mapper_api: Mapper  = None
+        self.invoke_event = threading.Event()
         pass
     
     def start_server(self):
@@ -163,6 +164,10 @@ class Worker:
             while(True):
                 if self.state == STATE["reducer"]:
                     self.reducer_api.execute()  
+                elif self.state == STATE["mapper"]:
+                    self.mapper_api.execute()
+                else:
+                    self.wait_for_invocation()
                 
         except KeyboardInterrupt:
             self.stop_server()
@@ -174,6 +179,17 @@ class Worker:
         if self.state == STATE["idle"]:
             self.reducer_api = Reducer(self,centroids,mapper)
             self.ID = r_id
+            self.work_invocation()
             return True
         return False
+    
+    def wait_for_invocation(self):
+        if self.invoke_event.wait():
+            self.invoke_event.clear()
+            return
+        
+    def work_invocation(self):
+        ''' when any work is start call this after setting'''
+        self.invoke_event.set()
+
     

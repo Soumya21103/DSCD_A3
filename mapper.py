@@ -1,8 +1,8 @@
 import os
 import math
 import grpc
-import mapper_pb2
-import mapper_pb2_grpc
+from grpc_modules import mapper_pb2
+from grpc_modules import mapper_pb2_grpc
 from concurrent import futures
 
 
