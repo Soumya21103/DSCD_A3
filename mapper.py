@@ -6,7 +6,7 @@ from grpc_modules import mapper_pb2_grpc
 from concurrent import futures
 
 
-def map(centroids, points):
+def map(centroids, points, R):
     intermediate_output = []
     for p in points:
         distance = []
@@ -19,25 +19,42 @@ def map(centroids, points):
         closest_centroid = min(distance, key=lambda x: x[1])
         intermediate_output.append((closest_centroid[0], (p, 1)))
 
-    partition(intermediate_output)
+    partition(intermediate_output, R)
 
-def partition(inter):
+def partition(inter, R):
     global id
     node_dir = f"M{id}"
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    node_dir = os.path.join(script_dir, f"M{id}")
     os.makedirs(node_dir, exist_ok=True)
 
-    # Sorted based off the index of centroids, but assignment's new point reagrding this confusing
-    #check later
-    inter = sorted(inter, key=lambda x: x[0])
-
+    K = set()
     for j in inter:
-        partition_file = os.path.join(node_dir, f"partition_{j[0]}.txt")
-        with open(partition_file, "a") as file:
-            file.write(str(j) + "\n")
-        if j[0] not in partitioned_data:
-            partitioned_data[j[0]] = []
-        partitioned_data[j[0]].append(j)
+        K.add(j[0])
+        partition = j[0] % R
+        partition_file = os.path.join(node_dir, f"partition_{partition+1}.txt")
 
+        if partition not in partitioned_data.keys():
+            with open(partition_file, "w") as file:
+                file.write(f"{j}\n")
+            partitioned_data[partition] = [j]
+        else:
+            with open(partition_file, "a") as file:
+                file.write(f"{j}\n")
+            partitioned_data[partition].append(j)
+
+    # If R>K, create empty files for the extra partitions
+    if R>len(K):
+        k = len(K)+1
+        while k <= R:
+            partition_file = os.path.join(node_dir, f"partition_{k}.txt")
+            with open(partition_file, "w") as file:
+                file.write(f"")
+            partitioned_data[k-1] = []
+            k+=1
+
+
+    
 class MapperServer(mapper_pb2_grpc.MapperServicer):
     def __init__(self):
         self.indices = []
@@ -45,15 +62,18 @@ class MapperServer(mapper_pb2_grpc.MapperServicer):
         self.centroids_file = ""
         self.centroids = []
         self.points = []
+        self.R = 0
 
     def StartMapper(self, request, context):
+        self.R = request.R
         self.indices = list(request.indices)
         self.input_file = request.input_file
         self.centroids_file = request.centroids_file
-        all_points = points_from_file(input_file)
+        all_points = points_from_file(self.input_file)
 
         self.centroids = points_from_file(self.centroids_file)
         self.points = [all_points[i] for i in mapper_server.indices]
+
         return mapper_pb2.StartMapperResponse(success=True)
 
     def GetPartition(self, request, context):
@@ -73,6 +93,7 @@ class MapperServer(mapper_pb2_grpc.MapperServicer):
             context.set_details("Partition not found")
             return mapper_pb2.MapperResponse()
 
+
 def serve():
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     mapper_pb2_grpc.add_MapperServicer_to_server(MapperServer(), server)
@@ -87,6 +108,7 @@ def points_from_file(input_file):
     return points
 
 port = "50051"
+# change assignment of ID after adding to worker.py
 id = 1
 partitioned_data = {} 
 
@@ -94,5 +116,5 @@ mapper_server = MapperServer()
 while not mapper_server.indices or not mapper_server.input_file or not mapper_server.centroids_file:
     pass
 
-map(mapper_server.centroids, mapper_server.points)
+map(mapper_server.centroids, mapper_server.points, mapper_server.R)
 serve()
