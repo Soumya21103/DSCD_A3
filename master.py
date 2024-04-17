@@ -1,28 +1,61 @@
 from concurrent import futures
 import time
 import grpc
-import grpc_modules.master_pb2 as pb2
-import grpc_modules.master_pb2_grpc as pb2_grpc
+import grpc_modules.master_pb2 as master_pb2
+import grpc_modules.master_pb2_grpc as master_pb2_grpc
+import grpc_modules.mapper_pb2 as mapper_pb2
+import grpc_modules.mapper_pb2_grpc as mapper_pb2_grpc
+import grpc_modules.reduce_pb2 as reduce_pb2
+import grpc_modules.reduce_pb2_grpc as reduce_pb2_grpc
 
-class MasterServicer(pb2_grpc.MasterServicer):
+
+class MasterServicer(master_pb2_grpc.MasterServicer):
     def __init__(self) -> None:
         super().__init__()
 
-    def startMapper(self, request: pb2.invokeMapper, context):
+    def workComplete(self, request: master_pb2.ifComplete, context):
         pass
 
-    def startReducer(self, request: pb2.invokeReducer, context):
-        pass
 
-    def workComplete(self, request: pb2.ifComplete, context):
-        pass
+class Master:
+    def __init__(self) -> None:
+        self.numNodes = 3
+        self.k = 3
+        self.server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+        master_pb2_grpc.add_MasterServicerServicer_to_server(MasterServicer(), self.server)
+        self.port = self.server.add_insecure_port('[::]:50051')
+        print("Master Server is running on port:", self.port)
+        self.mapFinished = False
+        self.reducedData = []
 
-def serve():
-    server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    pb2_grpc.add_MasterServicer_to_server(MasterServicer(), server)
-    server.add_insecure_port('localhost:50051')
-    server.start()
-    server.wait_for_termination()
+    def startServer(self):
+        server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+        master_pb2_grpc.add_MasterServicerServicer_to_server(MasterServicer(), server)
+        server.start()
+        server.wait_for_termination()
 
-if __name__ == '__main__':
-    serve()
+    def dividePoints(self,numNodes):
+        numPoints = 0
+        with open("Data/Input/points.txt", "r") as fp:
+            for line in fp:
+                numPoints += 1
+
+        numPartition = numPoints/numNodes
+        fs = []
+        for i in range(numNodes-1):
+            start = i*numPartition
+            end = (i+1)*numPartition
+            fs.append((start,end))
+        fs.append((end,numPoints))
+        return fs
+    
+    def invokeMapper(self, start, end):
+        channel = grpc.insecure_channel('localhost:%d' % 50051)
+        mapperStub = mapper_pb2_grpc.add_MapperServicer_to_server(MasterServicer, grpc.server([grpc.local_stack()]))
+        request = mapper_pb2.StartMapperRequest(
+            start = start,
+            end = end
+        )
+        response = mapperStub.StartMapper(request)
+        print(response.success)
+

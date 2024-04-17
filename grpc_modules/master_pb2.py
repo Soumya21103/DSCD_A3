@@ -14,25 +14,17 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0cmaster.proto\x12\x06master\"\"\n\ncoordinate\x12\t\n\x01x\x18\x01 \x01(\x03\x12\t\n\x01y\x18\x02 \x01(\x03\"[\n\x0cinvokeMapper\x12\x12\n\nstartIndex\x18\x01 \x01(\x03\x12\x10\n\x08\x65ndIndex\x18\x02 \x01(\x03\x12%\n\tcentroids\x18\x03 \x03(\x0b\x32\x12.master.coordinate\"\x0f\n\rinvokeReducer\"(\n\x08response\x12\x10\n\x08willWork\x18\x01 \x01(\x08\x12\n\n\x02id\x18\x02 \x01(\x03\"\x0c\n\nifComplete\"$\n\x06status\x12\x0e\n\x06ifDone\x18\x01 \x01(\x08\x12\n\n\x02id\x18\x02 \x01(\x03\x32\xb4\x01\n\x0eMasterServicer\x12\x35\n\x0bstartMapper\x12\x14.master.invokeMapper\x1a\x10.master.response\x12\x37\n\x0cstartReducer\x12\x15.master.invokeReducer\x1a\x10.master.response\x12\x32\n\x0cworkComplete\x12\x12.master.ifComplete\x1a\x0e.master.statusb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0cmaster.proto\x12\x06master\"\x0c\n\nifComplete\"$\n\x06status\x12\x0e\n\x06ifDone\x18\x01 \x01(\x08\x12\n\n\x02id\x18\x02 \x01(\x03\x32\x46\n\x0eMasterServicer\x12\x34\n\x0cworkComplete\x12\x12.master.ifComplete\x1a\x0e.master.status\"\x00\x62\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'master_pb2', _globals)
 if _descriptor._USE_C_DESCRIPTORS == False:
   DESCRIPTOR._options = None
-  _globals['_COORDINATE']._serialized_start=24
-  _globals['_COORDINATE']._serialized_end=58
-  _globals['_INVOKEMAPPER']._serialized_start=60
-  _globals['_INVOKEMAPPER']._serialized_end=151
-  _globals['_INVOKEREDUCER']._serialized_start=153
-  _globals['_INVOKEREDUCER']._serialized_end=168
-  _globals['_RESPONSE']._serialized_start=170
-  _globals['_RESPONSE']._serialized_end=210
-  _globals['_IFCOMPLETE']._serialized_start=212
-  _globals['_IFCOMPLETE']._serialized_end=224
-  _globals['_STATUS']._serialized_start=226
-  _globals['_STATUS']._serialized_end=262
-  _globals['_MASTERSERVICER']._serialized_start=265
-  _globals['_MASTERSERVICER']._serialized_end=445
+  _globals['_IFCOMPLETE']._serialized_start=24
+  _globals['_IFCOMPLETE']._serialized_end=36
+  _globals['_STATUS']._serialized_start=38
+  _globals['_STATUS']._serialized_end=74
+  _globals['_MASTERSERVICER']._serialized_start=76
+  _globals['_MASTERSERVICER']._serialized_end=146
 # @@protoc_insertion_point(module_scope)

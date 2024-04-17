@@ -14,16 +14,6 @@ class MasterServicerStub(object):
         Args:
             channel: A grpc.Channel.
         """
-        self.startMapper = channel.unary_unary(
-                '/master.MasterServicer/startMapper',
-                request_serializer=master__pb2.invokeMapper.SerializeToString,
-                response_deserializer=master__pb2.response.FromString,
-                )
-        self.startReducer = channel.unary_unary(
-                '/master.MasterServicer/startReducer',
-                request_serializer=master__pb2.invokeReducer.SerializeToString,
-                response_deserializer=master__pb2.response.FromString,
-                )
         self.workComplete = channel.unary_unary(
                 '/master.MasterServicer/workComplete',
                 request_serializer=master__pb2.ifComplete.SerializeToString,
@@ -34,18 +24,6 @@ class MasterServicerStub(object):
 class MasterServicerServicer(object):
     """Missing associated documentation comment in .proto file."""
 
-    def startMapper(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def startReducer(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
     def workComplete(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -55,16 +33,6 @@ class MasterServicerServicer(object):
 
 def add_MasterServicerServicer_to_server(servicer, server):
     rpc_method_handlers = {
-            'startMapper': grpc.unary_unary_rpc_method_handler(
-                    servicer.startMapper,
-                    request_deserializer=master__pb2.invokeMapper.FromString,
-                    response_serializer=master__pb2.response.SerializeToString,
-            ),
-            'startReducer': grpc.unary_unary_rpc_method_handler(
-                    servicer.startReducer,
-                    request_deserializer=master__pb2.invokeReducer.FromString,
-                    response_serializer=master__pb2.response.SerializeToString,
-            ),
             'workComplete': grpc.unary_unary_rpc_method_handler(
                     servicer.workComplete,
                     request_deserializer=master__pb2.ifComplete.FromString,
@@ -79,40 +47,6 @@ def add_MasterServicerServicer_to_server(servicer, server):
  # This class is part of an EXPERIMENTAL API.
 class MasterServicer(object):
     """Missing associated documentation comment in .proto file."""
-
-    @staticmethod
-    def startMapper(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/master.MasterServicer/startMapper',
-            master__pb2.invokeMapper.SerializeToString,
-            master__pb2.response.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def startReducer(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/master.MasterServicer/startReducer',
-            master__pb2.invokeReducer.SerializeToString,
-            master__pb2.response.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
     def workComplete(request,

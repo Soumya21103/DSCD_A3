@@ -3,29 +3,7 @@ syntax = "proto3";
 package master;
 
 service MasterServicer {
-  rpc startMapper(invokeMapper) returns (response);
-  rpc startReducer(invokeReducer) returns (response);
-
-  rpc workComplete(ifComplete) returns (status);
-}
-
-message coordinate {
-  int64 x = 1;
-  int64 y = 2;
-}
-
-message invokeMapper {
-  int64 startIndex= 1; 
-  int64 endIndex= 2;
-  repeated coordinate centroids= 3;
-}
-
-message invokeReducer {
-}
-
-message response {
-  bool willWork = 1;
-  int64 id = 2;
+  rpc workComplete(ifComplete) returns (status) {}
 }
 
 message ifComplete {
