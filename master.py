@@ -8,6 +8,7 @@ import grpc_modules.mapper_pb2_grpc as mapper_pb2_grpc
 import grpc_modules.reduce_pb2 as reduce_pb2
 import grpc_modules.reduce_pb2_grpc as reduce_pb2_grpc
 
+NODELIST = ["localhost:50051", "localhost:50052", "localhost:50053"]
 
 class MasterServicer(master_pb2_grpc.MasterServicer):
     def __init__(self) -> None:
@@ -21,6 +22,7 @@ class Master:
     def __init__(self) -> None:
         self.numNodes = 3
         self.k = 3
+        self.flag = 0
         self.server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
         master_pb2_grpc.add_MasterServicerServicer_to_server(
             MasterServicer(), self.server
@@ -67,8 +69,49 @@ class Master:
             MasterServicer, grpc.server([grpc.local_stack()])
         )
         stub = reduce_pb2_grpc.ReducerStub(channel)
-        dataList = list(zip(*self.reducedData))  # transpose the data
-        request = reduce_pb2.invocationRequest(data=dataList)
+        request = reduce_pb2.invocationRequest(data=self.reducedData)
         result = stub.invokeReducer(request)
         self.finalResult = result
         print(result)
+
+    def checkIfMapFinished(self):
+        channel = grpc.insecure_channel("localhost:50051")
+        masterStub = master_pb2_grpc.add_MasterServicerServicer_to_server(
+            MasterServicer, grpc.server([grpc.local_stack()])
+        )
+        stub = master_pb2_grpc.MasterServicerStub(channel)
+        request = master_pb2.ifComplete()
+        response = stub.workComplete(request)
+        if response.status == "True":
+            self.mapFinished = True
+
+    def checkIfReduceFinished(self):
+        channel = grpc.insecure_channel("localhost:50051")
+        masterStub = master_pb2_grpc.add_MasterServicerServicer_to_server(
+            MasterServicer, grpc.server([grpc.local_stack()])
+        )
+        stub = master_pb2_grpc.MasterServicerStub(channel)
+        request = master_pb2.ifComplete()
+        response = stub.workComplete(request)
+        if response.status == "True":
+            self.reduceFinished = True
+
+    def checkReducerHeartBeat(self, node):
+        channel = grpc.insecure_channel(node)
+        stub = reduce_pb2_grpc.add_ReducerServicer_to_server()
+        request = reduce_pb2.HeartBeatRequest()
+        try:
+            response = reduce_pb2.HeartBeatResponse()
+            print(response)
+        except Exception as e:
+            print(e)
+        
+
+    def masterbate(self):
+        if self.flag == 1:
+            print("Converged")
+            return
+        
+        fs = self.dividePoints(self.numNodes)
+
+        
