@@ -50,12 +50,20 @@ class Master:
         return fs
     
     def invokeMapper(self, start, end):
-        channel = grpc.insecure_channel('localhost:%d' % 50051)
-        mapperStub = mapper_pb2_grpc.add_MapperServicer_to_server(MasterServicer, grpc.server([grpc.local_stack()]))
-        request = mapper_pb2.StartMapperRequest(
+        channel = grpc.insecure_channel('localhost:50051')
+        mapperStub = mapper_pb2_grpc(channel)
+        request = mapper_pb2.MapperRequest(
             start = start,
             end = end
         )
-        response = mapperStub.StartMapper(request)
-        print(response.success)
+        response = mapperStub.MapperResponse(request)
+        print(response)
 
+    def invokeReducer(self):
+        channel = grpc.insecure_channel('localhost:50051')
+        reducerStub = reduce_pb2_grpc.add_ReducerServicer_to_server(MasterServicer, grpc.server([grpc.local_stack()]))
+        request = reduce_pb2.StartReduceRequest(
+            data = self.reducedData
+        )
+        response = reducerStub.StartReduce(request)
+        print(response.success)
