@@ -22,8 +22,10 @@ class Master:
         self.numNodes = 3
         self.k = 3
         self.server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-        master_pb2_grpc.add_MasterServicerServicer_to_server(MasterServicer(), self.server)
-        self.port = self.server.add_insecure_port('[::]:50051')
+        master_pb2_grpc.add_MasterServicerServicer_to_server(
+            MasterServicer(), self.server
+        )
+        self.port = self.server.add_insecure_port("[::]:50051")
         print("Master Server is running on port:", self.port)
         self.mapFinished = False
         self.reducedData = []
@@ -34,36 +36,39 @@ class Master:
         server.start()
         server.wait_for_termination()
 
-    def dividePoints(self,numNodes):
+    def dividePoints(self, numNodes):
         numPoints = 0
         with open("Data/Input/points.txt", "r") as fp:
             for line in fp:
                 numPoints += 1
 
-        numPartition = numPoints/numNodes
+        numPartition = numPoints / numNodes
         fs = []
-        for i in range(numNodes-1):
-            start = i*numPartition
-            end = (i+1)*numPartition
-            fs.append((start,end))
-        fs.append((end,numPoints))
+        for i in range(numNodes - 1):
+            start = i * numPartition
+            end = (i + 1) * numPartition
+            fs.append((start, end))
+        fs.append((end, numPoints))
         return fs
-    
+
     def invokeMapper(self, start, end):
-        channel = grpc.insecure_channel('localhost:50051')
-        mapperStub = mapper_pb2_grpc(channel)
-        request = mapper_pb2.MapperRequest(
-            start = start,
-            end = end
+        channel = grpc.insecure_channel("localhost:50051")
+        mapperStub = mapper_pb2_grpc.add_MapperServicer_to_server(
+            MasterServicer, grpc.server([grpc.local_stack()])
         )
-        response = mapperStub.MapperResponse(request)
+        stub = mapper_pb2_grpc.MapperStub(channel)
+        request = mapper_pb2.MapperRequest(start=start, end=end)
+        response = stub.GetPartition(request)
         print(response)
 
     def invokeReducer(self):
-        channel = grpc.insecure_channel('localhost:50051')
-        reducerStub = reduce_pb2_grpc.add_ReducerServicer_to_server(MasterServicer, grpc.server([grpc.local_stack()]))
-        request = reduce_pb2.StartReduceRequest(
-            data = self.reducedData
+        channel = grpc.insecure_channel("localhost:50051")
+        reducerStub = reduce_pb2_grpc.add_ReducerServicer_to_server(
+            MasterServicer, grpc.server([grpc.local_stack()])
         )
-        response = reducerStub.StartReduce(request)
-        print(response.success)
+        stub = reduce_pb2_grpc.ReducerStub(channel)
+        dataList = list(zip(*self.reducedData))  # transpose the data
+        request = reduce_pb2.invocationRequest(data=dataList)
+        result = stub.invokeReducer(request)
+        self.finalResult = result
+        print(result)
