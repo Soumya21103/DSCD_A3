@@ -111,16 +111,55 @@ class Master:
     def hearbeat_checker(self): 
         asyncio.run(self.h_check())
 
-    # async def h_check(self):
+    async def h_check(self):
+        tasks = []
+        init = time.time()
+        for i in self.mapper_list.keys():
+            if self.mapper_list[i]["status"] == STATUS["working"]:
+                tasks.append(asyncio.create_task(self.send_heartbeat(self.mapper_list[i]["id"],self.mapper_list[i]["socket"],"mapper")))
+        for i in self.reducer_list.keys():
+            if self.reducer_list[i]["status"] == STATUS["working"]:
+                tasks.append(asyncio.create_task(self.send_heartbeat(self.reducer_list[i]["id"],self.reducer_list[i]["socket"],"reducer")))
+        ret = asyncio.gather(*tasks)
+        for s,i,t in ret:
+            if s == False:
+                if t == "reducer":
+                    threading.Thread(target=self.rerun_reducer,args=(i,)).start()
+                else:
+                    threading.Thread(target=self.rerun_reducer,args=(i,)).start()
         
-    # async def send_heartbeat(self,socket:str, type: str):
-    #     if type == "reducer":
-    #         with grpc
+
+    def rerun_reducer(self,id):
+        self.assign_reducer_with_task(id,mapper_socket=self.completed_mapper)
+
+    def rerun_mapper(self,id):
+        self.assign_mapper_with_task(self.task[id])
+    
+    async def send_heartbeat(self,id:int,socket:str, type: str) -> tuple[bool,int,str]:
+        try:
+            if type == "reducer":
+                with grpc.insecure_channel(socket,options=[('grpc.connect_timeout_ms', 2000),]) as channel:
+                    stub = reduce_pb2_grpc.ReducerStub()
+                    ret: reduce_pb2.HeartBeatResponse = stub.HeartBeat(reduce_pb2.HeartBeatRequest(reducer_id=id))
+                if ret.status:
+                    return True,id,"reducer"
+                else:
+                    return True,id,"reducer"
+            else:
+                with grpc.insecure_channel(socket,options=[('grpc.connect_timeout_ms', 2000),]) as channel:
+                    stub = mapper_pb2_grpc.MapperStub()
+                    ret: mapper_pb2.HeartBeatResponse = stub.HeartBeat(mapper_pb2.HeartBeatRequest(mapper_id=id))
+                if ret.status:
+                    return True,id,"mapper"
+                else:
+                    return True,id,"mapeer"
+        except:
+            return False, id , type
 
     async def execution(self):
         for i in range(self.n_itter):
-            completed_mapper = self.map_phase()
-            completed_reducers = self.reduce_phase(completed_mapper)
+            self.completed_mapper = self.map_phase()
+            completed_reducers = self.reduce_phase(self.completed_mapper)
     
             if self.collect_from_reducers(completed_reducers):
                 continue
@@ -128,9 +167,9 @@ class Master:
                 print("something went horibly wrong")
 
     def map_phase(self) -> list:
-        task: list[tuple] = self.partition_mapper_task(self.input_file_meta,self.m_max)
+        self.task: list[tuple] = self.partition_mapper_task(self.input_file_meta,self.m_max)
         self.completed_mappers = [] # will be updated by completion rpc
-        for j in task:
+        for j in self.task:
             self.assign_mapper_with_task(j)
             # wait for map completion
         if self.completion_event.wait():
