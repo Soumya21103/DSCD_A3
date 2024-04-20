@@ -11,6 +11,7 @@ message MapperRequest {
 }
 
 message Point {
+    int32 id = 3; // TODO: CHANGE IN MAPPER CLASS
     double x = 1;
     double y = 2;
 }

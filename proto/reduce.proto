@@ -30,7 +30,8 @@ message OutputFileResponse {
 
 message centroidKeys {
     int32 centroid_id = 1;
-    float value = 2;
+    double x = 2; // TODO: NEED TO EDIT IN REDUCER
+    double y = 3;
 }
 message invocationRequest {
     int32 reducer_id = 1; // id assinged by MASTER helps determine which partition will be assigned to which reducer

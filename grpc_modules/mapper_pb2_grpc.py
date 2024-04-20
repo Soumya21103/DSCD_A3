@@ -19,12 +19,34 @@ class MapperStub(object):
                 request_serializer=mapper__pb2.MapperRequest.SerializeToString,
                 response_deserializer=mapper__pb2.MapperResponse.FromString,
                 )
+        self.StartMapper = channel.unary_unary(
+                '/Mapper/StartMapper',
+                request_serializer=mapper__pb2.StartMapperRequest.SerializeToString,
+                response_deserializer=mapper__pb2.StartMapperResponse.FromString,
+                )
+        self.HeartBeat = channel.unary_unary(
+                '/Mapper/HeartBeat',
+                request_serializer=mapper__pb2.HeartBeatRequest.SerializeToString,
+                response_deserializer=mapper__pb2.HeartBeatResponse.FromString,
+                )
 
 
 class MapperServicer(object):
     """Missing associated documentation comment in .proto file."""
 
     def GetPartition(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def StartMapper(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def HeartBeat(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -37,6 +59,16 @@ def add_MapperServicer_to_server(servicer, server):
                     servicer.GetPartition,
                     request_deserializer=mapper__pb2.MapperRequest.FromString,
                     response_serializer=mapper__pb2.MapperResponse.SerializeToString,
+            ),
+            'StartMapper': grpc.unary_unary_rpc_method_handler(
+                    servicer.StartMapper,
+                    request_deserializer=mapper__pb2.StartMapperRequest.FromString,
+                    response_serializer=mapper__pb2.StartMapperResponse.SerializeToString,
+            ),
+            'HeartBeat': grpc.unary_unary_rpc_method_handler(
+                    servicer.HeartBeat,
+                    request_deserializer=mapper__pb2.HeartBeatRequest.FromString,
+                    response_serializer=mapper__pb2.HeartBeatResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -62,5 +94,39 @@ class Mapper(object):
         return grpc.experimental.unary_unary(request, target, '/Mapper/GetPartition',
             mapper__pb2.MapperRequest.SerializeToString,
             mapper__pb2.MapperResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def StartMapper(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/Mapper/StartMapper',
+            mapper__pb2.StartMapperRequest.SerializeToString,
+            mapper__pb2.StartMapperResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def HeartBeat(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/Mapper/HeartBeat',
+            mapper__pb2.HeartBeatRequest.SerializeToString,
+            mapper__pb2.HeartBeatResponse.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

@@ -38,12 +38,14 @@ class OutputFileResponse(_message.Message):
     def __init__(self, reducer_id: _Optional[int] = ..., out_file_name: _Optional[str] = ..., out_file_line: _Optional[str] = ...) -> None: ...
 
 class centroidKeys(_message.Message):
-    __slots__ = ("centroid_id", "value")
+    __slots__ = ("centroid_id", "x", "y")
     CENTROID_ID_FIELD_NUMBER: _ClassVar[int]
-    VALUE_FIELD_NUMBER: _ClassVar[int]
+    X_FIELD_NUMBER: _ClassVar[int]
+    Y_FIELD_NUMBER: _ClassVar[int]
     centroid_id: int
-    value: float
-    def __init__(self, centroid_id: _Optional[int] = ..., value: _Optional[float] = ...) -> None: ...
+    x: float
+    y: float
+    def __init__(self, centroid_id: _Optional[int] = ..., x: _Optional[float] = ..., y: _Optional[float] = ...) -> None: ...
 
 class invocationRequest(_message.Message):
     __slots__ = ("reducer_id", "mapper_socket", "centroids")

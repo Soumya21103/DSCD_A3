@@ -3,14 +3,16 @@ syntax = "proto3";
 package master;
 
 service MasterServicer {
-  rpc workComplete(ifComplete) returns (status) {}
+  rpc workCompleteReducer(ifComplete) returns (status) {}
+  rpc workCompleteMapper(ifComplete) returns (status) {}
 }
 
 message ifComplete {
+  bool status = 1;
+  int64 id = 2;
 }
 
 message status {
-  bool ifDone = 1;
-  int64 id = 2;
+  bool status = 1;
 }
 

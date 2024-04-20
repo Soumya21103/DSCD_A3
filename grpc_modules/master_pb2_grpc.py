@@ -14,8 +14,13 @@ class MasterServicerStub(object):
         Args:
             channel: A grpc.Channel.
         """
-        self.workComplete = channel.unary_unary(
-                '/master.MasterServicer/workComplete',
+        self.workCompleteReducer = channel.unary_unary(
+                '/master.MasterServicer/workCompleteReducer',
+                request_serializer=master__pb2.ifComplete.SerializeToString,
+                response_deserializer=master__pb2.status.FromString,
+                )
+        self.workCompleteMapper = channel.unary_unary(
+                '/master.MasterServicer/workCompleteMapper',
                 request_serializer=master__pb2.ifComplete.SerializeToString,
                 response_deserializer=master__pb2.status.FromString,
                 )
@@ -24,7 +29,13 @@ class MasterServicerStub(object):
 class MasterServicerServicer(object):
     """Missing associated documentation comment in .proto file."""
 
-    def workComplete(self, request, context):
+    def workCompleteReducer(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def workCompleteMapper(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -33,8 +44,13 @@ class MasterServicerServicer(object):
 
 def add_MasterServicerServicer_to_server(servicer, server):
     rpc_method_handlers = {
-            'workComplete': grpc.unary_unary_rpc_method_handler(
-                    servicer.workComplete,
+            'workCompleteReducer': grpc.unary_unary_rpc_method_handler(
+                    servicer.workCompleteReducer,
+                    request_deserializer=master__pb2.ifComplete.FromString,
+                    response_serializer=master__pb2.status.SerializeToString,
+            ),
+            'workCompleteMapper': grpc.unary_unary_rpc_method_handler(
+                    servicer.workCompleteMapper,
                     request_deserializer=master__pb2.ifComplete.FromString,
                     response_serializer=master__pb2.status.SerializeToString,
             ),
@@ -49,7 +65,7 @@ class MasterServicer(object):
     """Missing associated documentation comment in .proto file."""
 
     @staticmethod
-    def workComplete(request,
+    def workCompleteReducer(request,
             target,
             options=(),
             channel_credentials=None,
@@ -59,7 +75,24 @@ class MasterServicer(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/master.MasterServicer/workComplete',
+        return grpc.experimental.unary_unary(request, target, '/master.MasterServicer/workCompleteReducer',
+            master__pb2.ifComplete.SerializeToString,
+            master__pb2.status.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def workCompleteMapper(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/master.MasterServicer/workCompleteMapper',
             master__pb2.ifComplete.SerializeToString,
             master__pb2.status.FromString,
             options, channel_credentials,

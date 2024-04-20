@@ -5,13 +5,15 @@ from typing import ClassVar as _ClassVar, Optional as _Optional
 DESCRIPTOR: _descriptor.FileDescriptor
 
 class ifComplete(_message.Message):
-    __slots__ = ()
-    def __init__(self) -> None: ...
+    __slots__ = ("status", "id")
+    STATUS_FIELD_NUMBER: _ClassVar[int]
+    ID_FIELD_NUMBER: _ClassVar[int]
+    status: bool
+    id: int
+    def __init__(self, status: bool = ..., id: _Optional[int] = ...) -> None: ...
 
 class status(_message.Message):
-    __slots__ = ("ifDone", "id")
-    IFDONE_FIELD_NUMBER: _ClassVar[int]
-    ID_FIELD_NUMBER: _ClassVar[int]
-    ifDone: bool
-    id: int
-    def __init__(self, ifDone: bool = ..., id: _Optional[int] = ...) -> None: ...
+    __slots__ = ("status",)
+    STATUS_FIELD_NUMBER: _ClassVar[int]
+    status: bool
+    def __init__(self, status: bool = ...) -> None: ...
