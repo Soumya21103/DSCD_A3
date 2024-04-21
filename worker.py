@@ -264,9 +264,22 @@ class Mapper:
     def execute(self):
         
         self.map(self.centroids, self.points, self.R)
+        self.send_success()
         self.parent.state = STATE["idle"]
         self.parent.ID = -1
         del self.parent.mapper_api
+
+    def send_success(self):
+        with grpc.insecure_channel(MASTER_SOCKET) as channel:
+            stub = ms2g.MasterServicerStub(channel)
+            ret: ms2.status = stub.workCompleteMapper(ms2.ifComplete(status=True,id=int(self.parent.ID)))
+        return ret.status
+
+    def send_failiure(self):
+        with grpc.insecure_channel(MASTER_SOCKET) as channel:
+            stub = ms2g.MasterServicerStub(channel)
+            ret: ms2.status = stub.workCompleteMapper(ms2.ifComplete(status=False,id=int(self.parent.ID)))
+        return ret.status
 
 
 class Worker:
