@@ -24,6 +24,7 @@ class ReduceServicer(rd2g.ReducerServicer):
         self.parent: Worker = parent
         
     def invokeReducer(self, request: rd2.invocationRequest, context):
+        print(request)
         if self.parent.set_as_reducer(request.centroids,request.mapper_socket,request.reducer_id):
             return rd2.invocationResponse(reducer_id=self.parent.ID,status=True)
         return rd2.invocationResponse(reducer_id=-1,status=False)
@@ -52,7 +53,7 @@ class Reducer:
         self.event_output = threading.Event()
 
         for i in centroids:
-            self.centroids[i.centroid_id] =  i.value
+            self.centroids[i.centroid_id] =   {"x":i.x, "y": i.y}
         for i in mapper:
             self.mapper.append(i)
 
@@ -163,11 +164,12 @@ class MapperServer(mapper_pb2_grpc.MapperServicer):
         super().__init__()
         self.parent: Worker = parent
 
-    def StartMapper(self, request, context):
+    def StartMapper(self, request: mapper_pb2.StartMapperRequest, context):
+        print("reciever request: ",request)
 
         # ASSUMED every mapper already knows location of input file
         # self.input_file = request.input_file
-        centroids = [(point.x, point.y) for point in request.centroids]
+        centroids = [(point.x, point.y) for point in request.centroid]
 
         if self.parent.set_as_mapper(centroids, list(request.indices), request.mapper_id, request.R):
             return mapper_pb2.StartMapperResponse(success = True)
@@ -199,13 +201,12 @@ class MapperServer(mapper_pb2_grpc.MapperServicer):
         return mapper_pb2.HeartBeatResponse(mapper_id=-1,status=False)
 
 class Mapper:
-    def __init__(self,parent, id, input_indices,  centroids) -> None:
-        self.portID = f"5005{id}"
+    def __init__(self,parent, id, input_indices,  centroids,R) -> None:
         self.parent: Worker = parent
         self.centroids = centroids
-        self.points = self.points_from_file("input.txt", input_indices)
+        self.points = self.points_from_file("Data/Input/points.txt", input_indices)
         self.partitioned_data = {}
-        self.R =0
+        self.R =R
         
     
     def points_from_file(self, input_file, indices):
@@ -230,7 +231,7 @@ class Mapper:
         self.partition(intermediate_output, R)
 
     def partition(self, inter, R):
-        id = self.id
+        id = self.parent.ID
         node_dir = f"M{id}"
         script_dir = os.path.dirname(os.path.abspath(__file__))
         node_dir = os.path.join(script_dir, f"M{id}")
@@ -292,14 +293,14 @@ class Worker:
         pass
     
     def start_server(self,mapper_socket,reducer_socket):
-        self.server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+        self.server_r = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
         self.server_c = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-        rd2g.add_ReducerServicer_to_server(ReduceServicer(self),self.server)
+        rd2g.add_ReducerServicer_to_server(ReduceServicer(self),self.server_r)
         mapper_pb2_grpc.add_MapperServicer_to_server(MapperServer(self),self.server_c)
-        self.server.add_insecure_port(reducer_socket)
+        self.server_r.add_insecure_port(reducer_socket)
         self.server_c.add_insecure_port(mapper_socket)
 
-        self.server.start()
+        self.server_r.start()
         self.server_c.start()
         try:
             while(True):
@@ -314,12 +315,13 @@ class Worker:
             self.stop_server()
 
     def stop_server(self):
-        self.server.stop(0)
+        self.server_r.stop(0)
         self.server_c.stop(0)
         pass
 
     def set_as_reducer(self,centroids : list[rd2.centroidKeys], mapper: list[str],r_id: int) -> bool:
         if self.state == STATE["idle"]:
+            self.state = STATE["reducer"]
             self.reducer_api = Reducer(self,centroids,mapper)
             self.ID = r_id
             self.work_invocation()
@@ -328,6 +330,7 @@ class Worker:
     
     def set_as_mapper(self, centroids, input_indices, id, R):
         if self.state == STATE["idle"]:
+            self.state = STATE["mapper"]
             self.mapper_api = Mapper(self, id, input_indices, centroids, R)
             self.ID = id
             self.work_invocation()
@@ -338,7 +341,8 @@ class Worker:
     def wait_for_invocation(self):
         if self.invoke_event.wait():
             self.invoke_event.clear()
-            return
+        print("done waiting", self.state)
+        return
         
     def work_invocation(self):
         ''' when any work is start call this after setting'''

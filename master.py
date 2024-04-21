@@ -13,13 +13,14 @@ import reduce_pb2 as reduce_pb2
 import reduce_pb2_grpc as reduce_pb2_grpc
 import sys
 
-NODELIST = ["localhost:50051", "localhost:50052", "localhost:50053"]
+# NODELIST = ["localhost:50051", "localhost:50052", "localhost:50053"]
 MASTER_SOCKET = "localhost:9090"
 class MasterServicer(master_pb2_grpc.MasterServicerServicer):
     def __init__(self,parrent) -> None:
         self._p: Master = parrent
         super().__init__()
     def workCompleteMapper(self, request : master_pb2.ifComplete, context):
+        print("recieved mapper",request)
         if request.status == False:
             self._p.assign_mapper_with_task(self._p.task[request.id])
         else:
@@ -28,10 +29,13 @@ class MasterServicer(master_pb2_grpc.MasterServicerServicer):
                 if request.id == self._p.mapper_list[i]["id"]:
                     socket = self._p.mapper_list[i]["socket"]
                     self._p.mapper_list[i]["status"] = STATUS["completed"]
-            self._p.completed_reducers.append(socket)
-        return master_pb2.status(True)
+            self._p.completed_mappers.append(socket)
+            if(len(self._p.completed_mappers) == self._p.m_max):
+                self._p.completion_event.set()
+        return master_pb2.status(status=True)
     
     def workCompleteReducer(self, request : master_pb2.ifComplete, context):
+        print("recieved reducer",request)
         if request.status == False:
             self._p.assign_reducer_with_task(self._p.task[request.id],self._p.completed_mapper)
         else:
@@ -41,7 +45,9 @@ class MasterServicer(master_pb2_grpc.MasterServicerServicer):
                     id = i
                     self._p.reducer_list[i]["status"] = STATUS["completed"]
             self._p.completed_reducers.append(id)
-        return master_pb2.status(True)
+            if(len(self._p.completed_reducers) == self._p.r_max):
+                self._p.completion_event.set()
+        return master_pb2.status(status=True)
 
 STATUS = {
     "idle": 0,
@@ -113,11 +119,11 @@ class Master:
         with open(input_file,"r") as f:
             for i in range(self.n_centroids):
                 read = f.readline()
-                x = read.split()
+                x = read.strip().split(",")
                 l += 1
-                c_dict[i] = {"x": x[0],"y":x[1]}
+                c_dict[i] = {"x": float(x[0]),"y":float(x[1])}
             while read != "":
-                f.readline()
+                read = f.readline()
                 l+=1
         return {
             "len": l,
@@ -125,27 +131,25 @@ class Master:
         }
     
     def assign_initial_centroid_list(self):
-        with open("centroids.txt","w") as f:
+        with open("centroids.json","w") as f:
             json.dump(self.input_file_meta["centroid"],f,indent=4)
 
     
     def start_server(self):
         self.server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
         master_pb2_grpc.add_MasterServicerServicer_to_server(
-            MasterServicer(), self.server
+            MasterServicer(self), self.server
         )
-        self.server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-        master_pb2_grpc.add_MasterServicerServicer_to_server(MasterServicer(), self.server)
         self.server.add_insecure_port(MASTER_SOCKET)
         self.server.start()
-        threading.Thread(target=self.hearbeat_checker)
-        asyncio.run(self.execution())
+        threading.Thread(target=self.hearbeat_checker).start()
+        asyncio.run(self.execution(),debug=True)
 
     def stop_sever(self):
         self.server.stop()
 
     def hearbeat_checker(self): 
-        asyncio.run(self.h_check())
+        asyncio.run(self.h_check(),debug=True)
 
     async def h_check(self):
         tasks = []
@@ -178,29 +182,36 @@ class Master:
                     stub = reduce_pb2_grpc.ReducerStub()
                     ret: reduce_pb2.HeartBeatResponse = stub.HeartBeat(reduce_pb2.HeartBeatRequest(reducer_id=id))
                 if ret.status:
+                    print(f"sent heartbeat to {(id)} r")
                     return True,id,"reducer"
                 else:
-                    return True,id,"reducer"
+                    print(f"failed heartbeat to {(id)} r")
+                    return False,id,"reducer"
             else:
                 with grpc.insecure_channel(socket,options=[('grpc.connect_timeout_ms', 2000),]) as channel:
                     stub = mapper_pb2_grpc.MapperStub()
                     ret: mapper_pb2.HeartBeatResponse = stub.HeartBeat(mapper_pb2.HeartBeatRequest(mapper_id=id))
                 if ret.status:
+                    print(f"sent heartbeat to {(id)}m")
                     return True,id,"mapper"
                 else:
-                    return True,id,"mapeer"
+                    print(f"failed heartbeat to {(id)}m")
+                    return False,id,"mapeer"
         except:
             return False, id , type
 
     async def execution(self):
         for i in range(self.n_itter):
             self.completed_mapper = self.map_phase()
+            print("map phase done",i)
             completed_reducers = self.reduce_phase(self.completed_mapper)
-    
+            print("reduce phase done",i)
             if self.collect_from_reducers(completed_reducers):
+                print("collect phase done",i)
                 continue
             else:
                 print("something went horibly wrong")
+                break
 
     def map_phase(self) -> list:
         self.task: list[tuple] = self.partition_mapper_task(self.input_file_meta,self.m_max)
@@ -242,7 +253,8 @@ class Master:
                     self.mapper_list[mappers[self.m_itter]]["status"] = STATUS["working"]
                     break
 
-            except grpc.RpcError as e:
+            # except grpc.RpcError as e:
+            except KeyboardInterrupt as e:
                 if isinstance(e, grpc.Call):
                     if e.code() == grpc.StatusCode.DEADLINE_EXCEEDED:
                         print(f"Timeout occurred: ", e.details())
@@ -252,11 +264,11 @@ class Master:
     def get_centroid_for_mapper(self) -> list[mapper_pb2.Point]:
         ret = []
         with self.c_lock:
-            f = open("centroids.txt","r")
+            f = open("centroids.json","r")
             jd :dict = json.load(f)
         for i in jd.keys():
             ret.append(mapper_pb2.Point(
-                id=int(i), x = float(jd[i]["x"]), x = float(jd[i]["y"])
+                id=int(i), x = float(jd[i]["x"]), y = float(jd[i]["y"])
             ))
         return ret
     
@@ -277,7 +289,7 @@ class Master:
             self.r_itter += 1
             self.r_itter %= self.r_max
             try:
-                with grpc.insecure_channel(self.mapper_list[reducer[self.r_itter]]["socket"]) as channel:
+                with grpc.insecure_channel(self.reducer_list[reducer[self.r_itter]]["socket"]) as channel:
                     stub = reduce_pb2_grpc.ReducerStub(channel)
                     ret: reduce_pb2.invocationResponse = stub.invokeReducer(reduce_pb2.invocationRequest(
                         reducer_id=id,
@@ -288,7 +300,8 @@ class Master:
                     self.reducer_list[reducer[self.m_itter]]["status"] = STATUS["working"]
                     break
 
-            except grpc.RpcError as e:
+            # except grpc.RpcError as e:
+            except KeyboardInterrupt as e:
                 if isinstance(e, grpc.Call):
                     if e.code() == grpc.StatusCode.DEADLINE_EXCEEDED:
                         print(f"Timeout occurred: ", e.details())
@@ -298,11 +311,11 @@ class Master:
     def get_centroid_reducer(self) -> list[reduce_pb2.centroidKeys]:
         ret = []
         with self.c_lock:
-            f = open("centroids.txt","r")
+            f = open("centroids.json","r")
             jd :dict = json.load(f)
         for i in jd.keys():
             ret.append(reduce_pb2.centroidKeys(
-                centroid_id=int(i), x = float(jd[i]["x"]), x = float(jd[i]["y"])
+                centroid_id=int(i), x = float(jd[i]["x"]), y = float(jd[i]["y"])
             ))
         return ret
     def collect_from_reducers(self,completed_reducer: list) -> bool:
@@ -345,7 +358,7 @@ class Master:
 
     def save_centroid_list(self, data: dict) -> bool:
         with self.c_lock:
-            with open("centroids.txt","r") as f:
+            with open("centroids.json","r") as f:
                 jd: dict = json.load(f)
             try:
                 for i in jd.keys():
@@ -353,16 +366,16 @@ class Master:
             except KeyError:
                 print("key",i,"does not exist")
                 return False
-            with open("centroids.txt","w") as f:
+            with open("centroids.json","w") as f:
                 json.dump(data,f)
             return True
         
 
-if "__name__" == "__main__":
+if __name__ == "__main__":
     l = len(sys.argv)
     try:
-        if l == 5:
-            wserver = Master(sys.argv[0],sys.argv[1],sys.argv[2],sys.argv[3],sys.argv[4],)
+        if l == 6:
+            wserver = Master(sys.argv[1],sys.argv[2],sys.argv[3],sys.argv[4],sys.argv[5],)
             wserver.start_server()
             wserver.stop_sever()
         else:

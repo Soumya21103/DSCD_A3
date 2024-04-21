@@ -1,6 +1,18 @@
 {
     "0": {
         "reducer": "localhost:8080",
-        "mapper": "localhost:8081"
+        "mapper": "localhost:8090"
+    },
+    "1": {
+        "reducer": "localhost:8081",
+        "mapper": "localhost:8091"
+    },
+    "2": {
+        "reducer": "localhost:8082",
+        "mapper": "localhost:8092"
+    },
+    "3": {
+        "reducer": "localhost:8083",
+        "mapper": "localhost:8093"
     }
 }
