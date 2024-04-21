@@ -24,7 +24,7 @@ class ReducerStub(object):
                 request_serializer=reduce__pb2.HeartBeatRequest.SerializeToString,
                 response_deserializer=reduce__pb2.HeartBeatResponse.FromString,
                 )
-        self.getOutputFile = channel.unary_stream(
+        self.getOutputFile = channel.unary_unary(
                 '/Reducer.Reducer/getOutputFile',
                 request_serializer=reduce__pb2.OutputFileRequest.SerializeToString,
                 response_deserializer=reduce__pb2.OutputFileResponse.FromString,
@@ -65,7 +65,7 @@ def add_ReducerServicer_to_server(servicer, server):
                     request_deserializer=reduce__pb2.HeartBeatRequest.FromString,
                     response_serializer=reduce__pb2.HeartBeatResponse.SerializeToString,
             ),
-            'getOutputFile': grpc.unary_stream_rpc_method_handler(
+            'getOutputFile': grpc.unary_unary_rpc_method_handler(
                     servicer.getOutputFile,
                     request_deserializer=reduce__pb2.OutputFileRequest.FromString,
                     response_serializer=reduce__pb2.OutputFileResponse.SerializeToString,
@@ -125,7 +125,7 @@ class Reducer(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_stream(request, target, '/Reducer.Reducer/getOutputFile',
+        return grpc.experimental.unary_unary(request, target, '/Reducer.Reducer/getOutputFile',
             reduce__pb2.OutputFileRequest.SerializeToString,
             reduce__pb2.OutputFileResponse.FromString,
             options, channel_credentials,

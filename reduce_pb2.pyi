@@ -20,12 +20,10 @@ class HeartBeatResponse(_message.Message):
     def __init__(self, reducer_id: _Optional[int] = ..., status: bool = ...) -> None: ...
 
 class OutputFileRequest(_message.Message):
-    __slots__ = ("reducer_id", "out_file_name")
+    __slots__ = ("reducer_id",)
     REDUCER_ID_FIELD_NUMBER: _ClassVar[int]
-    OUT_FILE_NAME_FIELD_NUMBER: _ClassVar[int]
     reducer_id: int
-    out_file_name: str
-    def __init__(self, reducer_id: _Optional[int] = ..., out_file_name: _Optional[str] = ...) -> None: ...
+    def __init__(self, reducer_id: _Optional[int] = ...) -> None: ...
 
 class OutputFileResponse(_message.Message):
     __slots__ = ("reducer_id", "out_file_name", "out_file_line")

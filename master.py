@@ -54,6 +54,7 @@ STATUS = {
     "working": 1,
     "completed": 2
 }
+
 class Master:
     def __init__(self,n_map,n_reduce,n_iiter,k_centroids,input_file) -> None:
         # WE asume that the n_map + n_reduce <= n_workers
@@ -202,6 +203,7 @@ class Master:
 
     async def execution(self):
         for i in range(self.n_itter):
+            print(i)
             self.completed_mapper = self.map_phase()
             print("map phase done",i)
             completed_reducers = self.reduce_phase(self.completed_mapper)
@@ -322,8 +324,9 @@ class Master:
         # This data collection is serial in nature
         full_data = {}
         sanity_check = True
+        print(completed_reducer)
         for i in completed_reducer:
-            data: dict = self.get_data_from_reducer(self.reducer_list[i]["socket"])
+            data: dict = self.get_data_from_reducer(self.reducer_list[i])
             for j in data.keys():
                 if j in full_data:
                     print("multiple centroid for of same key")
@@ -335,21 +338,25 @@ class Master:
         else:
             return True
     
-    def get_data_from_reducer(r_socket: str) -> dict:
+    def get_data_from_reducer(self,red: dict) -> dict:
         fin = {}
         while True:
             try:
-                with grpc.insecure_channel(r_socket) as channel:
-                    stub = reduce_pb2_grpc.ReducerStub()
-                    ret: list[reduce_pb2.OutputFileResponse] = stub.getOutputFile(reduce_pb2.OutputFileRequest(r_socket))
-                file_s = ""
-                for i in ret:
-                    file_s += i.out_file_line
+                with grpc.insecure_channel(red["socket"]) as channel:
+                    stub = reduce_pb2_grpc.ReducerStub(channel)
+                    id = red["id"]
+                    ret:reduce_pb2.OutputFileResponse = stub.getOutputFile(reduce_pb2.OutputFileRequest(
+                        reducer_id=int(id)
+                        ))
+                file_s =ret.out_file_line
+                # for i in ret:
+                #     file_s += i.out_file_line
                 jd = json.loads(file_s) # hopefully this works or i'm going to cry
                 for i in jd:
                     fin[i] = jd[i]
                 return fin
-            except grpc.RpcError as e:
+            # except grpc.RpcError as e:
+            except KeyboardInterrupt as e:
                 if isinstance(e, grpc.Call):
                     if e.code() == grpc.StatusCode.DEADLINE_EXCEEDED:
                         print(f"Timeout occurred: ", e.details())

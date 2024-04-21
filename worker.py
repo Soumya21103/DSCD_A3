@@ -30,13 +30,13 @@ class ReduceServicer(rd2g.ReducerServicer):
         return rd2.invocationResponse(reducer_id=-1,status=False)
     
     def getOutputFile(self, request: rd2.OutputFileRequest, context):
+        print("out_request",request)
         if self.parent.state == STATE["reducer"] and self.parent.ID == request.reducer_id:
             file_name,desc = self.parent.reducer_api.open_output_descriptor()
-            line = "<start>"
-            while line != "":
-                line = desc.readline()
-                yield rd2.OutputFileResponse(reducer_id=self.parent.ID,out_file_name=file_name,out_file_line=line)
+            ret = rd2.OutputFileResponse(reducer_id=self.parent.ID,out_file_name=file_name,out_file_line=desc)
+            print(ret)
             self.parent.reducer_api.set_output_collected()
+            return ret
     
     def HeartBeat(self, request: rd2.HeartBeatRequest, context):
         if self.parent.state == STATE["reducer"] and request.reducer_id == self.parent.ID:
@@ -58,18 +58,23 @@ class Reducer:
             self.mapper.append(i)
 
     def execute(self):
-        self.partition = asyncio.run(self.get_reduce_partitions())
+        self.partition = asyncio.run(self.get_reduce_partitions(),debug=True)
         if self.partition == None:
             self.send_failiure()
+            self.parent.state = STATE["idle"]
+            self.parent.ID = -1
         else:
             for i in self.partition.keys():
                 self.final[i] = self.reduce(self.partition[i])
                 self.output_ready = self.create_output(self.final)
             if self.send_success():
                 self.wait_for_collection()
+            self.parent.state = STATE["idle"]
+            self.parent.ID = -1
         self.parent.state = STATE["idle"]
         self.parent.ID = -1
-        del self.parent.reducer_api
+        return
+        # del self.parent.reducer_api
 
     async def get_reduce_partitions(self) -> dict:
         TIMEOUT = 10 #sec
@@ -85,6 +90,7 @@ class Reducer:
             with grpc.insecure_channel(m_socket,options=[('grpc.connect_timeout_ms', timeout*1000),]) as channel:
                 stub = mapper_pb2_grpc.MapperStub(channel)
                 raw_ret: mapper_pb2.MapperResponse = stub.GetPartition(mapper_pb2.MapperRequest(partition_index=self.parent.ID))
+    
         except grpc.RpcError as e:
             if isinstance(e, grpc.Call):
                 if e.code() == grpc.StatusCode.DEADLINE_EXCEEDED:
@@ -115,7 +121,7 @@ class Reducer:
         return sorted_ret
 
     def reduce(self,int_list: list) -> tuple:
-        final_value = (0,0)
+        final_value = [0,0]
         count = 0
         for i in int_list:
             final_value[0] += i[0][0]
@@ -124,7 +130,7 @@ class Reducer:
 
         final_value[0] /= count
         final_value[1] /= count
-        return final_value
+        return tuple(final_value)
     
     def create_output(self, final:dict):
         try:
@@ -135,8 +141,10 @@ class Reducer:
         return True
     
     def open_output_descriptor(self):
-        return f"R{self.parent.ID}.json", open(f"R{self.parent.ID}.json","r")
-    
+        f = open(f"R{self.parent.ID}.json","r")
+        r = f.read()
+        f.close()
+        return f"R{self.parent.ID}.json", r
     def send_success(self):
         # TODO: write after master grpc are made
         with grpc.insecure_channel(MASTER_SOCKET) as channel:
@@ -268,7 +276,7 @@ class Mapper:
         self.send_success()
         self.parent.state = STATE["idle"]
         self.parent.ID = -1
-        del self.parent.mapper_api
+        # del self.parent.mapper_api
 
     def send_success(self):
         with grpc.insecure_channel(MASTER_SOCKET) as channel:
@@ -290,6 +298,7 @@ class Worker:
         self.reducer_api: Reducer = None
         self.mapper_api: Mapper  = None
         self.invoke_event = threading.Event()
+        
         pass
     
     def start_server(self,mapper_socket,reducer_socket):
@@ -309,6 +318,7 @@ class Worker:
                 elif self.state == STATE["mapper"]:
                     self.mapper_api.execute()
                 else:
+                    print(self.state)
                     self.wait_for_invocation()
         
         except KeyboardInterrupt:

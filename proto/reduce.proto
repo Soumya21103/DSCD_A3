@@ -5,7 +5,7 @@ package Reducer;
 service Reducer {
     rpc invokeReducer (invocationRequest) returns (invocationResponse);
     rpc HeartBeat (HeartBeatRequest) returns (HeartBeatResponse);
-    rpc getOutputFile (OutputFileRequest) returns (stream OutputFileResponse);
+    rpc getOutputFile (OutputFileRequest) returns (OutputFileResponse);
 }
 
 message HeartBeatRequest {
@@ -18,8 +18,8 @@ message HeartBeatResponse {
 }
 
 message OutputFileRequest {
-    int32 reducer_id = 1;
-    string out_file_name = 2; // change acordingly can be anything
+    int64 reducer_id = 1;
+    // string out_file_name = 2; // change acordingly can be anything
 }
 message OutputFileResponse {
     // this will send the list of lines in outputfile returns out_file_name == '' if output is does not exist
