@@ -364,7 +364,7 @@ if "__name__" == "__main__":
         if l == 5:
             wserver = Master(sys.argv[0],sys.argv[1],sys.argv[2],sys.argv[3],sys.argv[4],)
             wserver.start_server()
-            wserver.stop_server()
+            wserver.stop_sever()
         else:
             print("Invalid argument needs n_map n_reduce n_itter k_cent inputfile")
     except KeyboardInterrupt:
