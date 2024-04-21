@@ -1,9 +1,9 @@
-from grpc_modules import mapper_pb2 
-from grpc_modules import mapper_pb2_grpc
-from grpc_modules import reduce_pb2 as rd2
-from grpc_modules import reduce_pb2_grpc as rd2g
-from grpc_modules import master_pb2 as ms2
-from grpc_modules import master_pb2_grpc as ms2g
+import mapper_pb2  as mapper_pb2
+import mapper_pb2_grpc
+import reduce_pb2 as rd2
+import reduce_pb2_grpc as rd2g
+import master_pb2 as ms2
+import master_pb2_grpc as ms2g
 from concurrent import futures
 import grpc
 import asyncio
@@ -331,14 +331,14 @@ class Worker:
         ''' when any work is start call this after setting'''
         self.invoke_event.set()
 
-if "__name__" == "__main__":
+if __name__ == "__main__":
     l = len(sys.argv)
     try:
-        if l == 1:
+        if l == 2:
             f = open("worker.json")
             jd = json.load(f)
-            reducer_socket = jd[sys.argv[0]]["reducer"]
-            mapper_socket = jd[sys.argv[0]]["mapper"]
+            reducer_socket = jd[sys.argv[1]]["reducer"]
+            mapper_socket = jd[sys.argv[1]]["mapper"]
             wserver = Worker()
             wserver.start_server(mapper_socket,reducer_socket)
             wserver.stop_server()

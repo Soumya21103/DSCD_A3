@@ -5,12 +5,12 @@ import time
 import math
 import grpc
 import json
-import grpc_modules.master_pb2 as master_pb2
-import grpc_modules.master_pb2_grpc as master_pb2_grpc
-import grpc_modules.mapper_pb2 as mapper_pb2
-import grpc_modules.mapper_pb2_grpc as mapper_pb2_grpc
-import grpc_modules.reduce_pb2 as reduce_pb2
-import grpc_modules.reduce_pb2_grpc as reduce_pb2_grpc
+import master_pb2 as master_pb2
+import master_pb2_grpc as master_pb2_grpc
+import mapper_pb2 as mapper_pb2
+import mapper_pb2_grpc as mapper_pb2_grpc
+import reduce_pb2 as reduce_pb2
+import reduce_pb2_grpc as reduce_pb2_grpc
 import sys
 
 NODELIST = ["localhost:50051", "localhost:50052", "localhost:50053"]
