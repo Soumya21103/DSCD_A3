@@ -14,14 +14,20 @@ import reduce_pb2_grpc as reduce_pb2_grpc
 import sys
 import logging
 
+def print_dump(s:str):
+    f = open("m_dump.txt")
+    f.write(s+"\n")
+    f.close()
+    
 logging.basicConfig(level=logging.INFO)
 MASTER_SOCKET = "localhost:9090"
 class MasterServicer(master_pb2_grpc.MasterServicerServicer):
     def __init__(self,parrent) -> None:
         self._p: Master = parrent
         super().__init__()
+
     def workCompleteMapper(self, request : master_pb2.ifComplete, context):
-        print("recieved mapper",request)
+        print_dump(f"Work Done for mapper {request.id}")
         if request.status == False:
             self._p.assign_mapper_with_task(self._p.task[request.id])
         else:
@@ -36,7 +42,7 @@ class MasterServicer(master_pb2_grpc.MasterServicerServicer):
         return master_pb2.status(status=True)
     
     def workCompleteReducer(self, request : master_pb2.ifComplete, context):
-        print("recieved reducer",request)
+        print_dump(f"Work Done for reducer {request.id}")
         if request.status == False:
             self._p.assign_reducer_with_task(request.id,self._p.completed_mapper)
         else:
@@ -172,12 +178,15 @@ class Master:
         
 
     def rerun_reducer(self,id):
+        print_dump(f"Re running reducer for id {id}")
         self.assign_reducer_with_task(id,mapper_socket=self.completed_mapper)
 
     def rerun_mapper(self,id):
+        print_dump(f"Re running mapper for id {id}")
         self.assign_mapper_with_task(self.task[id])
     
     async def send_heartbeat(self,id:int,socket:str, type: str) -> tuple[bool,int,str]:
+        print_dump(f"Heartbeat rpc")
         try:
             if type == "reducer":
                 with grpc.insecure_channel(socket,options=[('grpc.connect_timeout_ms', 2000),]) as channel:
@@ -204,7 +213,7 @@ class Master:
 
     async def execution(self):
         for i in range(self.n_itter):
-            print(i)
+            print_dump(f"Itteration {i}")
             self.completed_mapper = self.map_phase()
             print("map phase done",i)
             completed_reducers = self.reduce_phase(self.completed_mapper)
@@ -217,6 +226,7 @@ class Master:
                 break
 
     def map_phase(self) -> list:
+        print_dump(f"Map phase")
         self.task: list[tuple] = self.partition_mapper_task(self.input_file_meta,self.m_max)
         self.completed_mappers = [] # will be updated by completion rpc  LIST OF SOCKETS
         for j in self.task:
@@ -239,6 +249,7 @@ class Master:
         return task
     
     def assign_mapper_with_task(self,task: tuple) -> bool:
+        print_dump(f"Assigning task {task} to a mapper")
         mappers = list(self.mapper_list.keys())
         while(True):
             self.m_itter += 1
@@ -277,6 +288,7 @@ class Master:
         return ret
     
     def reduce_phase(self, completed_mapper: list)  -> list:
+        print_dump(f"Starting reduce phase")
         self.completed_reducers = [] # will be updated by completion rpc LIST OF IDS
         for j in range(self.r_max):
             self.assign_reducer_with_task(j, completed_mapper)
@@ -288,6 +300,7 @@ class Master:
         return self.completed_reducers
     
     def assign_reducer_with_task(self,id:int, mapper_socket:list[str]):
+        print_dump(f"Assigning reducer for id {id}")
         reducer = list(self.reducer_list.keys())
         while(True):
             self.r_itter += 1
@@ -325,6 +338,7 @@ class Master:
             ))
         return ret
     def collect_from_reducers(self,completed_reducer: list) -> bool:
+        print_dump(f"Getting final output from reducers")
         # This data collection is serial in nature
         full_data = {}
         sanity_check = True
@@ -346,6 +360,7 @@ class Master:
             return True
     
     def get_data_from_reducer(self,red: dict) -> dict:
+        print_dump(f"getting data from Reducer {red}")
         fin = {}
         while True:
             try:
@@ -370,6 +385,7 @@ class Master:
                         print(f"UNable to connect to remote host",e.details())
 
     def save_centroid_list(self, data: dict) -> bool:
+        print_dump(f"Finalizing centroid")
         with self.c_lock:
             with open("centroids.json","r") as f:
                 jd: dict = json.load(f)
@@ -395,4 +411,3 @@ if __name__ == "__main__":
             print("Invalid argument needs n_map n_reduce n_itter k_cent inputfile")
     except KeyboardInterrupt:
         wserver.stop_sever()
-    

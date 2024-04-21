@@ -11,11 +11,18 @@ import json
 import threading
 import math, os
 import sys
+import random as rnd
 STATE = {
     "idle"   : 0,
     "reducer": 1,
     "mapper" : 2
 }
+M_FACT = None
+def print_dump(s:str):
+    f = open(f"m_dump{M_FACT}.txt")
+    f.write(s+"\n")
+    f.close()
+
 MASTER_SOCKET = "localhost:9090"
 class ReduceServicer(rd2g.ReducerServicer):
     '''Reciever for all rpc'''
@@ -25,12 +32,12 @@ class ReduceServicer(rd2g.ReducerServicer):
         
     def invokeReducer(self, request: rd2.invocationRequest, context):
         if self.parent.set_as_reducer(request.centroids,request.mapper_socket,request.reducer_id):
-            print("invocation",request)
+            print_dump(f"Invocation Request recieved for {request.reducer_id}")
             return rd2.invocationResponse(reducer_id=self.parent.ID,status=True)
         return rd2.invocationResponse(reducer_id=-1,status=False)
     
     def gOF(self, request: rd2.OFRR, context):
-        print("out_request",request)
+        print_dump(f"Output Request recieved for {request.reducer_id}")
         if self.parent.state == STATE["reducer"] and self.parent.ID == request.reducer_id:
             file_name,desc = self.parent.reducer_api.open_output_descriptor()
             ret = rd2.OFR(reducer_id=self.parent.ID,out_file=file_name,content=desc)
@@ -40,6 +47,7 @@ class ReduceServicer(rd2g.ReducerServicer):
         return  rd2.OFR(reducer_id=-1,out_file="",content="")
     
     def HeartBeat(self, request: rd2.HeartBeatRequest, context):
+        print_dump(f"HearBeat Request recieved for {request.reducer_id}")
         if self.parent.state == STATE["reducer"] and request.reducer_id == self.parent.ID:
             return rd2.HeartBeatResponse(reducer_id=self.parent.ID,status=True)
         return rd2.HeartBeatResponse(reducer_id=-1,status=False)
@@ -78,6 +86,7 @@ class Reducer:
         # del self.parent.reducer_api
 
     async def get_reduce_partitions(self) -> dict:
+        print_dump(f"Collecting partitions")
         TIMEOUT = 10 #sec
         self.fail = False
         tasks = [asyncio.create_task(self.get_partition_task(i,TIMEOUT)) for i in self.mapper]
@@ -86,6 +95,7 @@ class Reducer:
         return sorted_inter
 
     async def get_partition_task(self,m_socket,timeout) -> list:
+        print_dump(f"Getting partition rom {m_socket}")
         partition = []
         try:
             with grpc.insecure_channel(m_socket,options=[('grpc.connect_timeout_ms', timeout*1000),]) as channel:
@@ -110,6 +120,7 @@ class Reducer:
         return partition
 
     def suffle_sort(self,recieved_partitions) -> dict:
+        print_dump(f"Shuffle Sort")
         sorted_ret = dict()
         if(self.fail):
             return None
@@ -122,6 +133,7 @@ class Reducer:
         return sorted_ret
 
     def reduce(self,int_list: list) -> tuple:
+        print_dump(f"Reducing targets")
         final_value = [0,0]
         count = 0
         for i in int_list:
@@ -134,6 +146,7 @@ class Reducer:
         return tuple(final_value)
     
     def create_output(self, final:dict):
+        print_dump(f"Creating Outputs")
         try:
             with open(f"R{self.parent.ID}.json","w") as f:
                 json.dump(final,f,indent=4)
@@ -146,11 +159,17 @@ class Reducer:
         r = f.read()
         f.close()
         return f"R{self.parent.ID}.json", r
+    
     def send_success(self):
         # TODO: write after master grpc are made
         with grpc.insecure_channel(MASTER_SOCKET) as channel:
             stub = ms2g.MasterServicerStub(channel)
-            ret: ms2.status = stub.workCompleteReducer(ms2.ifComplete(status=True,id=int(self.parent.ID)))
+            if rnd.random() > 0.5:
+                ret: ms2.status = stub.workCompleteReducer(ms2.ifComplete(status=True,id=int(self.parent.ID)))
+                print_dump(f"Successful")
+            else:
+                ret: ms2.status = stub.workCompleteReducer(ms2.ifComplete(status=False,id=int(self.parent.ID)))
+                print_dump(f"Unsuccesful")
         return ret.status
 
     def send_failiure(self):
@@ -158,6 +177,7 @@ class Reducer:
         with grpc.insecure_channel(MASTER_SOCKET) as channel:
             stub = ms2g.MasterServicerStub(channel)
             ret: ms2.status = stub.workCompleteReducer(ms2.ifComplete(status=False,id=int(self.parent.ID)))
+            print_dump(f"Unsuccesful")
         return ret.status
     
     def set_output_collected(self):
@@ -166,6 +186,7 @@ class Reducer:
     def wait_for_collection(self):
         if self.event_output.wait():
             self.event_output.clear()
+            print_dump(f"Output collected")
         return
 
 class MapperServer(mapper_pb2_grpc.MapperServicer):
@@ -175,7 +196,7 @@ class MapperServer(mapper_pb2_grpc.MapperServicer):
 
     def StartMapper(self, request: mapper_pb2.StartMapperRequest, context):
         print("reciever request: ",request)
-
+        print_dump(f"Start mapper request for task {request.mapper_id}")
         # ASSUMED every mapper already knows location of input file
         # self.input_file = request.input_file
         centroids = [(point.x, point.y) for point in request.centroid]
@@ -186,6 +207,7 @@ class MapperServer(mapper_pb2_grpc.MapperServicer):
         return mapper_pb2.StartMapperResponse(success=False)
 
     def GetPartition(self, request, context):
+        print_dump(f"Get Partition request from reducer")
         partition_index = request.partition_index
         pd = self.parent.mapper_api.partitioned_data
 
@@ -205,6 +227,8 @@ class MapperServer(mapper_pb2_grpc.MapperServicer):
             return mapper_pb2.MapperResponse()
 
     def HeartBeat(self, request: mapper_pb2.HeartBeatRequest, context):
+        
+        print_dump(f"Heartbeat request")
         if self.parent.state == STATE["mapper"] and request.mapper_id == self.parent.ID:
             return mapper_pb2.HeartBeatResponse(mapper_id=self.parent.ID,status=True)
         return mapper_pb2.HeartBeatResponse(mapper_id=-1,status=False)
@@ -225,6 +249,7 @@ class Mapper:
         return points
     
     def map(self, centroids, points, R):
+        print_dump(f"mapping input")
         intermediate_output = []
         for p in points:
             distance = []
@@ -240,6 +265,7 @@ class Mapper:
         self.partition(intermediate_output, R)
 
     def partition(self, inter, R):
+        print_dump(f"partitioning intermidiate")
         id = self.parent.ID
         node_dir = f"M{id}"
         script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -282,13 +308,19 @@ class Mapper:
     def send_success(self):
         with grpc.insecure_channel(MASTER_SOCKET) as channel:
             stub = ms2g.MasterServicerStub(channel)
-            ret: ms2.status = stub.workCompleteMapper(ms2.ifComplete(status=True,id=int(self.parent.ID)))
+            if rnd.random() > 0.5:
+                ret: ms2.status = stub.workCompleteReducer(ms2.ifComplete(status=True,id=int(self.parent.ID)))
+                print_dump(f"Successful")
+            else:
+                ret: ms2.status = stub.workCompleteReducer(ms2.ifComplete(status=False,id=int(self.parent.ID)))
+                print_dump(f"Unsuccesful")
         return ret.status
 
     def send_failiure(self):
         with grpc.insecure_channel(MASTER_SOCKET) as channel:
             stub = ms2g.MasterServicerStub(channel)
             ret: ms2.status = stub.workCompleteMapper(ms2.ifComplete(status=False,id=int(self.parent.ID)))
+            print_dump(f"Unsuccesful")
         return ret.status
 
 
@@ -331,6 +363,7 @@ class Worker:
         pass
 
     def set_as_reducer(self,centroids : list[rd2.centroidKeys], mapper: list[str],r_id: int) -> bool:
+        print_dump(f"Becomming Reducer")
         if self.state == STATE["idle"]:
             self.state = STATE["reducer"]
             self.reducer_api = Reducer(self,centroids,mapper)
@@ -340,6 +373,7 @@ class Worker:
         return False
     
     def set_as_mapper(self, centroids, input_indices, id, R):
+        print_dump(f"Becomming Mapper")
         if self.state == STATE["idle"]:
             self.state = STATE["mapper"]
             self.mapper_api = Mapper(self, id, input_indices, centroids, R)
@@ -350,6 +384,7 @@ class Worker:
     
     
     def wait_for_invocation(self):
+        print_dump(f"Idle")
         if self.invoke_event.wait():
             self.invoke_event.clear()
         print("done waiting", self.state)
@@ -365,6 +400,7 @@ if __name__ == "__main__":
         if l == 2:
             f = open("worker.json")
             jd = json.load(f)
+            M_FACT = sys.argv[1]
             reducer_socket = jd[sys.argv[1]]["reducer"]
             mapper_socket = jd[sys.argv[1]]["mapper"]
             wserver = Worker()
@@ -374,4 +410,3 @@ if __name__ == "__main__":
             print("Invalid arguments")
     except KeyboardInterrupt:
         wserver.stop_server()
-    
