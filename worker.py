@@ -2,17 +2,21 @@ from grpc_modules import mapper_pb2
 from grpc_modules import mapper_pb2_grpc
 from grpc_modules import reduce_pb2 as rd2
 from grpc_modules import reduce_pb2_grpc as rd2g
+from grpc_modules import master_pb2 as ms2
+from grpc_modules import master_pb2_grpc as ms2g
+from concurrent import futures
 import grpc
 import asyncio
 import json
 import threading
 import math, os
+import sys
 STATE = {
     "idle"   : 0,
     "reducer": 1,
     "mapper" : 2
 }
-
+MASTER_SOCKET = "localhost:9090"
 class ReduceServicer(rd2g.ReducerServicer):
     '''Reciever for all rpc'''
     def __init__(self,parent) -> None:
@@ -134,11 +138,17 @@ class Reducer:
     
     def send_success(self):
         # TODO: write after master grpc are made
-        pass
+        with grpc.insecure_channel(MASTER_SOCKET) as channel:
+            stub = ms2g.MasterServicerStub(channel)
+            ret: ms2.status = stub.workCompleteReducer(ms2.ifComplete(status=True,id=int(self.parent.ID)))
+        return ret.status
 
     def send_failiure(self):
         # TODO: write after master grpc are made
-        pass
+        with grpc.insecure_channel(MASTER_SOCKET) as channel:
+            stub = ms2g.MasterServicerStub(channel)
+            ret: ms2.status = stub.workCompleteReducer(ms2.ifComplete(status=False,id=int(self.parent.ID)))
+        return ret.status
     
     def set_output_collected(self):
         self.event_output.set()
@@ -268,7 +278,16 @@ class Worker:
         self.invoke_event = threading.Event()
         pass
     
-    def start_server(self):
+    def start_server(self,mapper_socket,reducer_socket):
+        self.server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+        self.server_c = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+        rd2g.add_ReducerServicer_to_server(ReduceServicer(self),self.server)
+        mapper_pb2_grpc.add_MapperServicer_to_server(MapperServer(self),self.server_c)
+        self.server.add_insecure_port(reducer_socket)
+        self.server_c.add_insecure_port(mapper_socket)
+
+        self.server.start()
+        self.server_c.start()
         try:
             while(True):
                 if self.state == STATE["reducer"]:
@@ -277,11 +296,13 @@ class Worker:
                     self.mapper_api.execute()
                 else:
                     self.wait_for_invocation()
-                
+        
         except KeyboardInterrupt:
             self.stop_server()
 
     def stop_server(self):
+        self.server.stop(0)
+        self.server_c.stop(0)
         pass
 
     def set_as_reducer(self,centroids : list[rd2.centroidKeys], mapper: list[str],r_id: int) -> bool:
@@ -310,4 +331,19 @@ class Worker:
         ''' when any work is start call this after setting'''
         self.invoke_event.set()
 
+if "__name__" == "__main__":
+    l = len(sys.argv)
+    try:
+        if l == 1:
+            f = open("worker.json")
+            jd = json.load(f)
+            reducer_socket = jd[sys.argv[0]]["reducer"]
+            mapper_socket = jd[sys.argv[0]]["mapper"]
+            wserver = Worker()
+            wserver.start_server(mapper_socket,reducer_socket)
+            wserver.stop_server()
+        else:
+            print("Invalid arguments")
+    except KeyboardInterrupt:
+        wserver.stop_server()
     

@@ -1,0 +1,6 @@
+{
+    "0": {
+        "reducer": "localhost:8080",
+        "mapper": "localhost:8081"
+    }
+}

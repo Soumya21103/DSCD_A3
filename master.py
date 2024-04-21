@@ -11,17 +11,37 @@ import grpc_modules.mapper_pb2 as mapper_pb2
 import grpc_modules.mapper_pb2_grpc as mapper_pb2_grpc
 import grpc_modules.reduce_pb2 as reduce_pb2
 import grpc_modules.reduce_pb2_grpc as reduce_pb2_grpc
+import sys
 
 NODELIST = ["localhost:50051", "localhost:50052", "localhost:50053"]
-
+MASTER_SOCKET = "localhost:9090"
 class MasterServicer(master_pb2_grpc.MasterServicerServicer):
-    def __init__(self) -> None:
+    def __init__(self,parrent) -> None:
+        self._p: Master = parrent
         super().__init__()
-    def workCompleteMapper(self, request, context):
-        return super().workCompleteMapper(request, context)
+    def workCompleteMapper(self, request : master_pb2.ifComplete, context):
+        if request.status == False:
+            self._p.assign_mapper_with_task(self._p.task[request.id])
+        else:
+            socket = None
+            for i in self._p.mapper_list.keys():
+                if request.id == self._p.mapper_list[i]["id"]:
+                    socket = self._p.mapper_list[i]["socket"]
+                    self._p.mapper_list[i]["status"] = STATUS["completed"]
+            self._p.completed_reducers.append(socket)
+        return master_pb2.status(True)
     
-    def workCompleteReducer(self, request, context):
-        return super().workCompleteReducer(request, context)
+    def workCompleteReducer(self, request : master_pb2.ifComplete, context):
+        if request.status == False:
+            self._p.assign_reducer_with_task(self._p.task[request.id],self._p.completed_mapper)
+        else:
+            id = None
+            for i in self._p.reducer_list.keys():
+                if request.id ==  self._p.reducer_list[i]["id"]:
+                    id = i
+                    self._p.reducer_list[i]["status"] = STATUS["completed"]
+            self._p.completed_reducers.append(id)
+        return master_pb2.status(True)
 
 STATUS = {
     "idle": 0,
@@ -35,15 +55,15 @@ class Master:
         self.c_lock = threading.Lock() # to access centrioid
         self.completion_event = threading.Event()
         self.r_itter = 0
-        self.r_max = n_reduce
+        self.r_max = int(n_reduce)
         self.m_itter = 0
-        self.m_max = n_map
-        self.n_centroids = k_centroids
-        self.n_itter = n_iiter
+        self.m_max = int(n_map)
+        self.n_centroids = int(k_centroids)
+        self.n_itter = int(n_iiter)
 
         w_list = self.get_list_of_workers()
         self.reducer_list, self.mapper_list = self.partition_workers(w_list)
-        self.passive_mapper_list = list(self.mapper_list.keys())
+        self.passive_mapper_list  = list(self.mapper_list.keys())
         self.passive_reducer_list = list(self.reducer_list.keys())
         self.input_file_meta = self.get_input_file_meta(input_file) # number of lines
         self.assign_initial_centroid_list()
@@ -63,15 +83,27 @@ class Master:
         flag = False
         if self.m_max > len(w_list)/2 or self.r_max > len(w_list)/2:
             for i in range(self.m_max):
-                m[i] = w_list[i]
+                m[i] = {
+                    "socket": w_list[i]["mapper"],
+                    "status": STATUS["idle"],
+                    "id": i
+                    }
             for i in range(self.m_max,self.m_max+self.r_max):
                 r[i] = w_list[i]
         else:
             for i in range(len(w_list)):
                 if i % 2  == 0:
-                    m[i//2] = w_list[i]
+                    m[i//2] = {
+                    "socket": w_list[i]["mapper"],
+                    "status": STATUS["idle"],
+                    "id": i//2
+                    }
                 else:
-                    r[i//2] = w_list[i]
+                    r[i//2] = {
+                    "socket": w_list[i]["reducer"],
+                    "status": STATUS["idle"],
+                    "id": i//2
+                    }
         return r, m 
     
     def get_input_file_meta(self,input_file: str) -> dict:
@@ -102,11 +134,15 @@ class Master:
         master_pb2_grpc.add_MasterServicerServicer_to_server(
             MasterServicer(), self.server
         )
-        server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-        master_pb2_grpc.add_MasterServicerServicer_to_server(MasterServicer(), server)
-        server.start()
+        self.server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+        master_pb2_grpc.add_MasterServicerServicer_to_server(MasterServicer(), self.server)
+        self.server.add_insecure_port(MASTER_SOCKET)
+        self.server.start()
         threading.Thread(target=self.hearbeat_checker)
         asyncio.run(self.execution())
+
+    def stop_sever(self):
+        self.server.stop()
 
     def hearbeat_checker(self): 
         asyncio.run(self.h_check())
@@ -168,7 +204,7 @@ class Master:
 
     def map_phase(self) -> list:
         self.task: list[tuple] = self.partition_mapper_task(self.input_file_meta,self.m_max)
-        self.completed_mappers = [] # will be updated by completion rpc
+        self.completed_mappers = [] # will be updated by completion rpc  LIST OF SOCKETS
         for j in self.task:
             self.assign_mapper_with_task(j)
             # wait for map completion
@@ -225,7 +261,7 @@ class Master:
         return ret
     
     def reduce_phase(self, completed_mapper: list)  -> list:
-        self.completed_reducers = [] # will be updated by completion rpc
+        self.completed_reducers = [] # will be updated by completion rpc LIST OF IDS
         for j in range(self.r_max):
             self.assign_reducer_with_task(j, completed_mapper)
             
@@ -320,106 +356,17 @@ class Master:
             with open("centroids.txt","w") as f:
                 json.dump(data,f)
             return True
-
         
 
-
-# class Master:
-#     def __init__(self,n_map,n_reduce,k_centroids,input_file) -> None:
-#         self.numNodes = 3
-#         self.k = 3
-#         self.flag = 0
-#         self.server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-#         master_pb2_grpc.add_MasterServicerServicer_to_server(
-#             MasterServicer(), self.server
-#         )
-#         self.port = self.server.add_insecure_port("[::]:50051")
-#         print("Master Server is running on port:", self.port)
-#         self.mapFinished = False
-#         self.reducedData = []
-#         self.Mappers  = []
-#         self.Reducers = []
-
-#     def startServer(self):
-#         server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-#         master_pb2_grpc.add_MasterServicerServicer_to_server(MasterServicer(), server)
-#         server.start()
-#         server.wait_for_termination()
-
-#     def dividePoints(self, numNodes):
-#         numPoints = 0
-#         with open("Data/Input/points.txt", "r") as fp:
-#             for line in fp:
-#                 numPoints += 1
-
-#         numPartition = numPoints / numNodes
-#         fs = []
-#         for i in range(numNodes - 1):
-#             start = i * numPartition
-#             end = (i + 1) * numPartition
-#             fs.append((start, end))
-#         fs.append((end, numPoints))
-#         return fs
-
-#     def invokeMapper(self, start, end):
-#         channel = grpc.insecure_channel("localhost:50051")
-#         mapperStub = mapper_pb2_grpc.add_MapperServicer_to_server(
-#             MasterServicer, grpc.server([grpc.local_stack()])
-#         )
-#         stub = mapper_pb2_grpc.MapperStub(channel)
-#         request = mapper_pb2.MapperRequest(start=start, end=end)
-#         response = stub.GetPartition(request)
-#         print(response)
-
-#     def invokeReducer(self):
-#         channel = grpc.insecure_channel("localhost:50051")
-#         reducerStub = reduce_pb2_grpc.add_ReducerServicer_to_server(
-#             MasterServicer, grpc.server([grpc.local_stack()])
-#         )
-#         stub = reduce_pb2_grpc.ReducerStub(channel)
-#         request = reduce_pb2.invocationRequest(data=self.reducedData)
-#         result = stub.invokeReducer(request)
-#         self.finalResult = result
-#         print(result)
-
-#     def checkIfMapFinished(self):
-#         channel = grpc.insecure_channel("localhost:50051")
-#         masterStub = master_pb2_grpc.add_MasterServicerServicer_to_server(
-#             MasterServicer, grpc.server([grpc.local_stack()])
-#         )
-#         stub = master_pb2_grpc.MasterServicerStub(channel)
-#         request = master_pb2.ifComplete()
-#         response = stub.workComplete(request)
-#         if response.status == "True":
-#             self.mapFinished = True
-
-#     def checkIfReduceFinished(self):
-#         channel = grpc.insecure_channel("localhost:50051")
-#         masterStub = master_pb2_grpc.add_MasterServicerServicer_to_server(
-#             MasterServicer, grpc.server([grpc.local_stack()])
-#         )
-#         stub = master_pb2_grpc.MasterServicerStub(channel)
-#         request = master_pb2.ifComplete()
-#         response = stub.workComplete(request)
-#         if response.status == "True":
-#             self.reduceFinished = True
-
-#     def checkReducerHeartBeat(self, node):
-#         channel = grpc.insecure_channel(node)
-#         stub = reduce_pb2_grpc.add_ReducerServicer_to_server()
-#         request = reduce_pb2.HeartBeatRequest()
-#         try:
-#             response = reduce_pb2.HeartBeatResponse()
-#             print(response)
-#         except Exception as e:
-#             print(e)
-        
-
-#     def masterbate(self):
-#         if self.flag == 1:
-#             print("Converged")
-#             return
-        
-#         fs = self.dividePoints(self.numNodes)
-
-        
+if "__name__" == "__main__":
+    l = len(sys.argv)
+    try:
+        if l == 5:
+            wserver = Master(sys.argv[0],sys.argv[1],sys.argv[2],sys.argv[3],sys.argv[4],)
+            wserver.start_server()
+            wserver.stop_server()
+        else:
+            print("Invalid argument needs n_map n_reduce n_itter k_cent inputfile")
+    except KeyboardInterrupt:
+        wserver.stop_sever()
+    
