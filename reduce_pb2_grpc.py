@@ -24,10 +24,10 @@ class ReducerStub(object):
                 request_serializer=reduce__pb2.HeartBeatRequest.SerializeToString,
                 response_deserializer=reduce__pb2.HeartBeatResponse.FromString,
                 )
-        self.getOutputFile = channel.unary_unary(
-                '/Reducer.Reducer/getOutputFile',
-                request_serializer=reduce__pb2.OutputFileRequest.SerializeToString,
-                response_deserializer=reduce__pb2.OutputFileResponse.FromString,
+        self.gOF = channel.unary_unary(
+                '/Reducer.Reducer/gOF',
+                request_serializer=reduce__pb2.OFRR.SerializeToString,
+                response_deserializer=reduce__pb2.OFR.FromString,
                 )
 
 
@@ -46,7 +46,7 @@ class ReducerServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def getOutputFile(self, request, context):
+    def gOF(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -65,10 +65,10 @@ def add_ReducerServicer_to_server(servicer, server):
                     request_deserializer=reduce__pb2.HeartBeatRequest.FromString,
                     response_serializer=reduce__pb2.HeartBeatResponse.SerializeToString,
             ),
-            'getOutputFile': grpc.unary_unary_rpc_method_handler(
-                    servicer.getOutputFile,
-                    request_deserializer=reduce__pb2.OutputFileRequest.FromString,
-                    response_serializer=reduce__pb2.OutputFileResponse.SerializeToString,
+            'gOF': grpc.unary_unary_rpc_method_handler(
+                    servicer.gOF,
+                    request_deserializer=reduce__pb2.OFRR.FromString,
+                    response_serializer=reduce__pb2.OFR.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -115,7 +115,7 @@ class Reducer(object):
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
-    def getOutputFile(request,
+    def gOF(request,
             target,
             options=(),
             channel_credentials=None,
@@ -125,8 +125,8 @@ class Reducer(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/Reducer.Reducer/getOutputFile',
-            reduce__pb2.OutputFileRequest.SerializeToString,
-            reduce__pb2.OutputFileResponse.FromString,
+        return grpc.experimental.unary_unary(request, target, '/Reducer.Reducer/gOF',
+            reduce__pb2.OFRR.SerializeToString,
+            reduce__pb2.OFR.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

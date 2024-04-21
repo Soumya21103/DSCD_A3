@@ -19,21 +19,21 @@ class HeartBeatResponse(_message.Message):
     status: bool
     def __init__(self, reducer_id: _Optional[int] = ..., status: bool = ...) -> None: ...
 
-class OutputFileRequest(_message.Message):
+class OFRR(_message.Message):
     __slots__ = ("reducer_id",)
     REDUCER_ID_FIELD_NUMBER: _ClassVar[int]
     reducer_id: int
     def __init__(self, reducer_id: _Optional[int] = ...) -> None: ...
 
-class OutputFileResponse(_message.Message):
-    __slots__ = ("reducer_id", "out_file_name", "out_file_line")
+class OFR(_message.Message):
+    __slots__ = ("reducer_id", "out_file", "content")
     REDUCER_ID_FIELD_NUMBER: _ClassVar[int]
-    OUT_FILE_NAME_FIELD_NUMBER: _ClassVar[int]
-    OUT_FILE_LINE_FIELD_NUMBER: _ClassVar[int]
+    OUT_FILE_FIELD_NUMBER: _ClassVar[int]
+    CONTENT_FIELD_NUMBER: _ClassVar[int]
     reducer_id: int
-    out_file_name: str
-    out_file_line: str
-    def __init__(self, reducer_id: _Optional[int] = ..., out_file_name: _Optional[str] = ..., out_file_line: _Optional[str] = ...) -> None: ...
+    out_file: str
+    content: str
+    def __init__(self, reducer_id: _Optional[int] = ..., out_file: _Optional[str] = ..., content: _Optional[str] = ...) -> None: ...
 
 class centroidKeys(_message.Message):
     __slots__ = ("centroid_id", "x", "y")

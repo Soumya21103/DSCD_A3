@@ -12,8 +12,9 @@ import mapper_pb2_grpc as mapper_pb2_grpc
 import reduce_pb2 as reduce_pb2
 import reduce_pb2_grpc as reduce_pb2_grpc
 import sys
+import logging
 
-# NODELIST = ["localhost:50051", "localhost:50052", "localhost:50053"]
+logging.basicConfig(level=logging.INFO)
 MASTER_SOCKET = "localhost:9090"
 class MasterServicer(master_pb2_grpc.MasterServicerServicer):
     def __init__(self,parrent) -> None:
@@ -37,11 +38,11 @@ class MasterServicer(master_pb2_grpc.MasterServicerServicer):
     def workCompleteReducer(self, request : master_pb2.ifComplete, context):
         print("recieved reducer",request)
         if request.status == False:
-            self._p.assign_reducer_with_task(self._p.task[request.id],self._p.completed_mapper)
+            self._p.assign_reducer_with_task(request.id,self._p.completed_mapper)
         else:
             id = None
             for i in self._p.reducer_list.keys():
-                if request.id ==  self._p.reducer_list[i]["id"]:
+                if request.id == self._p.reducer_list[i]["id"]:
                     id = i
                     self._p.reducer_list[i]["status"] = STATUS["completed"]
             self._p.completed_reducers.append(id)
@@ -143,7 +144,7 @@ class Master:
         )
         self.server.add_insecure_port(MASTER_SOCKET)
         self.server.start()
-        threading.Thread(target=self.hearbeat_checker).start()
+        # threading.Thread(target=self.hearbeat_checker).start()
         asyncio.run(self.execution(),debug=True)
 
     def stop_sever(self):
@@ -253,6 +254,7 @@ class Master:
                     ))
                 if ret.success:
                     self.mapper_list[mappers[self.m_itter]]["status"] = STATUS["working"]
+                    self.mapper_list[mappers[self.m_itter]]["id"] = task[0]
                     break
 
             # except grpc.RpcError as e:
@@ -292,6 +294,7 @@ class Master:
             self.r_itter %= self.r_max
             try:
                 with grpc.insecure_channel(self.reducer_list[reducer[self.r_itter]]["socket"]) as channel:
+                    print("ar",channel)
                     stub = reduce_pb2_grpc.ReducerStub(channel)
                     ret: reduce_pb2.invocationResponse = stub.invokeReducer(reduce_pb2.invocationRequest(
                         reducer_id=id,
@@ -300,6 +303,7 @@ class Master:
                     ))
                 if ret.status:
                     self.reducer_list[reducer[self.m_itter]]["status"] = STATUS["working"]
+                    self.reducer_list[reducer[self.m_itter]]["id"] = id
                     break
 
             # except grpc.RpcError as e:
@@ -326,6 +330,9 @@ class Master:
         sanity_check = True
         print(completed_reducer)
         for i in completed_reducer:
+            # for j in self.reducer_list.keys():
+            #     # if self.reducer_list[i]["id"] == i:
+            #     #     r_id = j
             data: dict = self.get_data_from_reducer(self.reducer_list[i])
             for j in data.keys():
                 if j in full_data:
@@ -343,18 +350,17 @@ class Master:
         while True:
             try:
                 with grpc.insecure_channel(red["socket"]) as channel:
+                    print("out",channel)
                     stub = reduce_pb2_grpc.ReducerStub(channel)
                     id = red["id"]
-                    ret:reduce_pb2.OutputFileResponse = stub.getOutputFile(reduce_pb2.OutputFileRequest(
-                        reducer_id=int(id)
-                        ))
-                file_s =ret.out_file_line
-                # for i in ret:
-                #     file_s += i.out_file_line
+                    ret: reduce_pb2.OFR = stub.gOF(reduce_pb2.OFRR(reducer_id=id))
+                file_s =ret.content
                 jd = json.loads(file_s) # hopefully this works or i'm going to cry
                 for i in jd:
                     fin[i] = jd[i]
+                print(fin)
                 return fin
+            
             # except grpc.RpcError as e:
             except KeyboardInterrupt as e:
                 if isinstance(e, grpc.Call):

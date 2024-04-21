@@ -24,19 +24,20 @@ class ReduceServicer(rd2g.ReducerServicer):
         self.parent: Worker = parent
         
     def invokeReducer(self, request: rd2.invocationRequest, context):
-        print(request)
         if self.parent.set_as_reducer(request.centroids,request.mapper_socket,request.reducer_id):
+            print("invocation",request)
             return rd2.invocationResponse(reducer_id=self.parent.ID,status=True)
         return rd2.invocationResponse(reducer_id=-1,status=False)
     
-    def getOutputFile(self, request: rd2.OutputFileRequest, context):
+    def gOF(self, request: rd2.OFRR, context):
         print("out_request",request)
         if self.parent.state == STATE["reducer"] and self.parent.ID == request.reducer_id:
             file_name,desc = self.parent.reducer_api.open_output_descriptor()
-            ret = rd2.OutputFileResponse(reducer_id=self.parent.ID,out_file_name=file_name,out_file_line=desc)
+            ret = rd2.OFR(reducer_id=self.parent.ID,out_file=file_name,content=desc)
             print(ret)
             self.parent.reducer_api.set_output_collected()
             return ret
+        return  rd2.OFR(reducer_id=-1,out_file="",content="")
     
     def HeartBeat(self, request: rd2.HeartBeatRequest, context):
         if self.parent.state == STATE["reducer"] and request.reducer_id == self.parent.ID:

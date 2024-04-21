@@ -5,7 +5,7 @@ package Reducer;
 service Reducer {
     rpc invokeReducer (invocationRequest) returns (invocationResponse);
     rpc HeartBeat (HeartBeatRequest) returns (HeartBeatResponse);
-    rpc getOutputFile (OutputFileRequest) returns (OutputFileResponse);
+    rpc gOF (OFRR) returns (OFR);
 }
 
 message HeartBeatRequest {
@@ -17,15 +17,14 @@ message HeartBeatResponse {
     bool status = 2; // if reducer id match and no other problem exist then returns true else false 
 }
 
-message OutputFileRequest {
+message OFRR {
     int64 reducer_id = 1;
     // string out_file_name = 2; // change acordingly can be anything
 }
-message OutputFileResponse {
-    // this will send the list of lines in outputfile returns out_file_name == '' if output is does not exist
+message OFR {
     int32 reducer_id = 1; // id assinged by MASTER helps determine which partition will be assigned to which reducer
-    string out_file_name = 2; // '' if output does not exist
-    string out_file_line = 3; // empty if output does not exist
+    string out_file = 2; // '' if output does not exist
+    string content = 3; // empty if output does not exist
 }
 
 message centroidKeys {
