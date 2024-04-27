@@ -19,7 +19,7 @@ STATE = {
 }
 M_FACT = None
 def print_dump(s:str):
-    f = open(f"m_dump{M_FACT}.txt")
+    f = open(f"m_dump{M_FACT}.txt","a")
     f.write(s+"\n")
     f.close()
 
@@ -70,18 +70,12 @@ class Reducer:
         self.partition = asyncio.run(self.get_reduce_partitions(),debug=True)
         if self.partition == None:
             self.send_failiure()
-            self.parent.state = STATE["idle"]
-            self.parent.ID = -1
         else:
             for i in self.partition.keys():
                 self.final[i] = self.reduce(self.partition[i])
-                self.output_ready = self.create_output(self.final)
+            self.output_ready = self.create_output(self.final)
             if self.send_success():
                 self.wait_for_collection()
-            self.parent.state = STATE["idle"]
-            self.parent.ID = -1
-        self.parent.state = STATE["idle"]
-        self.parent.ID = -1
         return
         # del self.parent.reducer_api
 
@@ -168,7 +162,9 @@ class Reducer:
                 ret: ms2.status = stub.workCompleteReducer(ms2.ifComplete(status=True,id=int(self.parent.ID)))
                 print_dump(f"Successful")
             else:
+                self.parent.state = STATE["idle"]
                 ret: ms2.status = stub.workCompleteReducer(ms2.ifComplete(status=False,id=int(self.parent.ID)))
+                ret.status = False
                 print_dump(f"Unsuccesful")
         return ret.status
 
@@ -176,8 +172,10 @@ class Reducer:
         # TODO: write after master grpc are made
         with grpc.insecure_channel(MASTER_SOCKET) as channel:
             stub = ms2g.MasterServicerStub(channel)
+            self.parent.state = STATE["idle"]
             ret: ms2.status = stub.workCompleteReducer(ms2.ifComplete(status=False,id=int(self.parent.ID)))
             print_dump(f"Unsuccesful")
+            ret.status = False
         return ret.status
     
     def set_output_collected(self):
@@ -187,6 +185,7 @@ class Reducer:
         if self.event_output.wait():
             self.event_output.clear()
             print_dump(f"Output collected")
+            self.parent.state = STATE["idle"]
         return
 
 class MapperServer(mapper_pb2_grpc.MapperServicer):
@@ -301,24 +300,25 @@ class Mapper:
         
         self.map(self.centroids, self.points, self.R)
         self.send_success()
-        self.parent.state = STATE["idle"]
-        self.parent.ID = -1
         # del self.parent.mapper_api
 
     def send_success(self):
         with grpc.insecure_channel(MASTER_SOCKET) as channel:
             stub = ms2g.MasterServicerStub(channel)
             if rnd.random() > 0.5:
-                ret: ms2.status = stub.workCompleteReducer(ms2.ifComplete(status=True,id=int(self.parent.ID)))
+                ret: ms2.status = stub.workCompleteMapper(ms2.ifComplete(status=True,id=int(self.parent.ID)))
+                self.parent.state = STATE["idle"]
                 print_dump(f"Successful")
             else:
-                ret: ms2.status = stub.workCompleteReducer(ms2.ifComplete(status=False,id=int(self.parent.ID)))
+                self.parent.state = STATE["idle"]
+                ret: ms2.status = stub.workCompleteMapper(ms2.ifComplete(status=False,id=int(self.parent.ID)))
                 print_dump(f"Unsuccesful")
         return ret.status
 
     def send_failiure(self):
         with grpc.insecure_channel(MASTER_SOCKET) as channel:
             stub = ms2g.MasterServicerStub(channel)
+            self.parent.state = STATE["idle"]
             ret: ms2.status = stub.workCompleteMapper(ms2.ifComplete(status=False,id=int(self.parent.ID)))
             print_dump(f"Unsuccesful")
         return ret.status

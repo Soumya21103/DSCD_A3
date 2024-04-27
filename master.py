@@ -15,7 +15,7 @@ import sys
 import logging
 
 def print_dump(s:str):
-    f = open("m_dump.txt")
+    f = open("m_dump.txt","a") # revert after doing
     f.write(s+"\n")
     f.close()
     
@@ -214,8 +214,15 @@ class Master:
     async def execution(self):
         for i in range(self.n_itter):
             print_dump(f"Itteration {i}")
+            
+            for i in self.reducer_list.keys():
+                self.reducer_list[i]["status"] = STATUS["idle"]
+                self.reducer_list[i]["id"] = -1
             self.completed_mapper = self.map_phase()
             print("map phase done",i)
+            for i in self.mapper_list.keys():
+                 self.mapper_list[i]["status"] = STATUS["idle"]
+                 self.mapper_list[i]["id"] = -1
             completed_reducers = self.reduce_phase(self.completed_mapper)
             print("reduce phase done",i)
             if self.collect_from_reducers(completed_reducers):
@@ -252,29 +259,35 @@ class Master:
         print_dump(f"Assigning task {task} to a mapper")
         mappers = list(self.mapper_list.keys())
         while(True):
-            self.m_itter += 1
-            self.m_itter %= self.m_max
-            try:
-                with grpc.insecure_channel(self.mapper_list[mappers[self.m_itter]]["socket"]) as channel:
-                    stub = mapper_pb2_grpc.MapperStub(channel)
-                    ret: mapper_pb2.StartMapperResponse = stub.StartMapper(mapper_pb2.StartMapperRequest(
-                        indices=range(task[1],task[2]),
-                        centroid=self.get_centroid_for_mapper(),
-                        mapper_id=task[0],
-                        R=self.r_max
-                    ))
-                if ret.success:
-                    self.mapper_list[mappers[self.m_itter]]["status"] = STATUS["working"]
-                    self.mapper_list[mappers[self.m_itter]]["id"] = task[0]
-                    break
-
-            # except grpc.RpcError as e:
-            except KeyboardInterrupt as e:
-                if isinstance(e, grpc.Call):
-                    if e.code() == grpc.StatusCode.DEADLINE_EXCEEDED:
-                        print(f"Timeout occurred: ", e.details())
-                    else:
-                        print(f"UNable to connect to remote host",e.details())
+            with self.w_lock:
+                self.m_itter += 1
+                self.m_itter %= self.m_max
+                if self.mapper_list[mappers[self.m_itter]]["status"] == STATUS["completed"]:
+                    continue
+                try:
+                    with grpc.insecure_channel(self.mapper_list[mappers[self.m_itter]]["socket"]) as channel:
+                        stub = mapper_pb2_grpc.MapperStub(channel)
+                        ret: mapper_pb2.StartMapperResponse = stub.StartMapper(mapper_pb2.StartMapperRequest(
+                            indices=range(task[1],task[2]),
+                            centroid=self.get_centroid_for_mapper(),
+                            mapper_id=task[0],
+                            R=self.r_max
+                        ))
+                        if ret.success:
+                            self.mapper_list[mappers[self.m_itter]]["status"] = STATUS["working"]
+                            self.mapper_list[mappers[self.m_itter]]["id"] = task[0]
+                            break
+                        else:
+                            self.mapper_list[mappers[self.m_itter]]["status"] = STATUS["idle"]
+                            self.mapper_list[mappers[self.m_itter]]["id"] = -1
+                # except grpc.RpcError as e:
+                except KeyboardInterrupt as e:
+                    if isinstance(e, grpc.Call):
+                        if e.code() == grpc.StatusCode.DEADLINE_EXCEEDED:
+                            print(f"Timeout occurred: ", e.details())
+                        else:
+                            print(f"UNable to connect to remote host",e.details())
+        print(self.mapper_list)
 
     def get_centroid_for_mapper(self) -> list[mapper_pb2.Point]:
         ret = []
@@ -303,29 +316,33 @@ class Master:
         print_dump(f"Assigning reducer for id {id}")
         reducer = list(self.reducer_list.keys())
         while(True):
-            self.r_itter += 1
-            self.r_itter %= self.r_max
-            try:
-                with grpc.insecure_channel(self.reducer_list[reducer[self.r_itter]]["socket"]) as channel:
-                    print("ar",channel)
-                    stub = reduce_pb2_grpc.ReducerStub(channel)
-                    ret: reduce_pb2.invocationResponse = stub.invokeReducer(reduce_pb2.invocationRequest(
-                        reducer_id=id,
-                        mapper_socket=mapper_socket,
-                        centroids= self.get_centroid_reducer()
-                    ))
-                if ret.status:
-                    self.reducer_list[reducer[self.m_itter]]["status"] = STATUS["working"]
-                    self.reducer_list[reducer[self.m_itter]]["id"] = id
-                    break
-
-            # except grpc.RpcError as e:
-            except KeyboardInterrupt as e:
-                if isinstance(e, grpc.Call):
-                    if e.code() == grpc.StatusCode.DEADLINE_EXCEEDED:
-                        print(f"Timeout occurred: ", e.details())
-                    else:
-                        print(f"UNable to connect to remote host",e.details())
+            with self.w_lock:
+                self.r_itter += 1
+                self.r_itter %= self.r_max
+                if self.reducer_list[reducer[self.r_itter]]["status"] == STATUS["completed"]:
+                    continue
+                try:
+                    with grpc.insecure_channel(self.reducer_list[reducer[self.r_itter]]["socket"]) as channel:
+                        print("ar",channel)
+                        print(self.completed_mapper)
+                        stub = reduce_pb2_grpc.ReducerStub(channel)
+                        ret: reduce_pb2.invocationResponse = stub.invokeReducer(reduce_pb2.invocationRequest(
+                            reducer_id=id,
+                            mapper_socket=mapper_socket,
+                            centroids= self.get_centroid_reducer()
+                        ))
+                    if ret.status:
+                        self.reducer_list[reducer[self.r_itter]]["status"] = STATUS["working"]
+                        self.reducer_list[reducer[self.r_itter]]["id"] = id
+                        break
+                    
+                # except grpc.RpcError as e:
+                except KeyboardInterrupt as e:
+                    if isinstance(e, grpc.Call):
+                        if e.code() == grpc.StatusCode.DEADLINE_EXCEEDED:
+                            print(f"Timeout occurred: ", e.details())
+                        else:
+                            print(f"UNable to connect to remote host",e.details())
 
     def get_centroid_reducer(self) -> list[reduce_pb2.centroidKeys]:
         ret = []
@@ -349,15 +366,15 @@ class Master:
             #     #     r_id = j
             data: dict = self.get_data_from_reducer(self.reducer_list[i])
             for j in data.keys():
-                if j in full_data:
+                if int(j) in full_data:
                     print("multiple centroid for of same key")
                     sanity_check = False
                 else:
-                    full_data[j] = data[j]
+                    full_data[int(j)] = {"x": data[j][0],"y": data[j][1]}
         if sanity_check and self.save_centroid_list(full_data):
-            return False
-        else:
             return True
+        else:
+            return False
     
     def get_data_from_reducer(self,red: dict) -> dict:
         print_dump(f"getting data from Reducer {red}")
