@@ -264,7 +264,7 @@ class Mapper:
         self.partition(intermediate_output, R)
 
     def partition(self, inter, R):
-        print_dump(f"partitioning intermidiate")
+        print_dump(f"partitioning intermidiate {R}")
         id = self.parent.ID
         node_dir = f"M{id}"
         script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -293,7 +293,7 @@ class Mapper:
                 partition_file = os.path.join(node_dir, f"partition_{k}.txt")
                 with open(partition_file, "w") as file:
                     file.write(f"")
-                self.partitioned_data[k-1] = []
+                self.partitioned_data[k] = []
                 k+=1
 
     def execute(self):
