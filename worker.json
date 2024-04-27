@@ -14,5 +14,9 @@
     "3": {
         "reducer": "localhost:8083",
         "mapper": "localhost:8093"
+    },
+    "4": {
+        "reducer": "localhost:8085",
+        "mapper": "localhost:8095"
     }
 }

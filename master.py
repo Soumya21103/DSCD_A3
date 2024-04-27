@@ -103,7 +103,11 @@ class Master:
                     "id": i
                     }
             for i in range(self.m_max,self.m_max+self.r_max):
-                r[i] = w_list[i]
+                r[i] ={
+                    "socket": w_list[i]["reducer"],
+                    "status": STATUS["idle"],
+                    "id": i
+                    }
         else:
             for i in range(len(w_list)):
                 if i % 2  == 0:
