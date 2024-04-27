@@ -15,7 +15,7 @@ import sys
 import logging
 
 def print_dump(s:str):
-    f = open("m_dump.txt","a") # revert after doing
+    f = open("m_dump.txt","a")
     f.write(s+"\n")
     f.close()
     
