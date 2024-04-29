@@ -340,8 +340,8 @@ class Master:
                         self.reducer_list[reducer[self.r_itter]]["id"] = id
                         break
                     
-                # except grpc.RpcError as e:
-                except KeyboardInterrupt as e:
+                except grpc.RpcError as e:
+                # except KeyboardInterrupt as e:
                     if isinstance(e, grpc.Call):
                         if e.code() == grpc.StatusCode.DEADLINE_EXCEEDED:
                             print(f"Timeout occurred: ", e.details())
@@ -397,8 +397,8 @@ class Master:
                 print(fin)
                 return fin
             
-            # except grpc.RpcError as e:
-            except KeyboardInterrupt as e:
+            except grpc.RpcError as e:
+            # except KeyboardInterrupt as e:
                 if isinstance(e, grpc.Call):
                     if e.code() == grpc.StatusCode.DEADLINE_EXCEEDED:
                         print(f"Timeout occurred: ", e.details())

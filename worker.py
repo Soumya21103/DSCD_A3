@@ -221,9 +221,7 @@ class MapperServer(mapper_pb2_grpc.MapperServicer):
                 partition_item.count = item[1][1]
             return response
         else:
-            context.set_code(grpc.StatusCode.NOT_FOUND)
-            context.set_details("Partition not found")
-            return mapper_pb2.MapperResponse()
+            return mapper_pb2.MapperResponse(items=[])
 
     def HeartBeat(self, request: mapper_pb2.HeartBeatRequest, context):
         
@@ -289,12 +287,13 @@ class Mapper:
         # If R>K, create empty files for the extra partitions
         if R>len(K):
             k = len(K)+1
-            while k <= R:
+            while k < R:
                 partition_file = os.path.join(node_dir, f"partition_{k}.txt")
                 with open(partition_file, "w") as file:
                     file.write(f"")
                 self.partitioned_data[k] = []
                 k+=1
+        print("DEBUG INFO: ",self.partitioned_data)
 
     def execute(self):
         
